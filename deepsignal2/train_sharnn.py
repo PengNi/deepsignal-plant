@@ -10,12 +10,23 @@ import sys
 import time
 import re
 
-from models import EncoderClassifier
+from models import SHARNN
 from dataloader import SignalFeaData
 from utils.process_utils import display_args
 from utils.process_utils import str2bool
 
 from utils.constants_torch import use_cuda
+
+
+def repackage_hidden(h):
+    """Wraps hidden states in new Tensors,
+    to detach them from their history."""
+    if h is None:
+        return None
+    if isinstance(h, torch.Tensor):
+        return h.detach()
+    else:
+        return tuple(repackage_hidden(v) for v in h)
 
 
 def train(args):
@@ -51,9 +62,9 @@ def train(args):
                     os.remove(model_dir + "/" + mfile)
         model_dir += "/"
 
-    model = EncoderClassifier(args.seq_len, args.signal_len, args.d_model, args.n_head, args.d_ff,
-                              args.layer_num, args.class_num, args.dropout_rate, is_seq=str2bool(args.is_seq),
-                              is_signal=str2bool(args.is_signal))
+    model = SHARNN(args.seq_len, args.emsize, args.nhid, args.nlayers, args.class_num,
+                   args.dropout_rate, args.dropout_rate, args.dropout_rate, args.dropout_rate,
+                   args.wdrop, args.tied)
     if use_cuda:
         model = model.cuda()
 
@@ -72,21 +83,34 @@ def train(args):
     curr_best_accuracy = 0
     for epoch in range(args.max_epoch_num):
         curr_best_accuracy_epoch = 0
+        h_hid, h_mems = None, None
         for i, sfeatures in enumerate(train_loader):
-            _, kmer, base_means, base_stds, base_signal_lens, signals, labels = sfeatures
+            if len(sfeatures[0]) < args.batch_size:
+                continue
+            _, kmer, base_means, base_stds, base_signal_lens, _, labels = sfeatures
             if use_cuda:
                 kmer = kmer.cuda()
                 base_means = base_means.cuda()
                 base_stds = base_stds.cuda()
                 base_signal_lens = base_signal_lens.cuda()
-                signals = signals.cuda()
+                # signals = signals.cuda()
                 labels = labels.cuda()
 
             model.train()
 
             # Forward pass
-            outputs, _ = model(kmer, base_means, base_stds, base_signal_lens, signals)
-            loss = criterion(outputs, labels)
+            if str2bool(args.prehid):
+                h, hlogits, h_hid, h_mems = model(kmer, base_means, base_stds, base_signal_lens,
+                                                  hidden=h_hid, mems=h_mems)
+                if h_hid is not None:
+                    h_hid = repackage_hidden(h_hid)
+                if h_mems is not None:
+                    h_mems = repackage_hidden(h_mems)
+            else:
+                h, hlogits, _, _ = model(kmer, base_means, base_stds, base_signal_lens,
+                                         hidden=h_hid, mems=h_mems)
+
+            loss = criterion(h, labels)
 
             # Backward and optimize
             optimizer.zero_grad()
@@ -95,19 +119,31 @@ def train(args):
 
             if (i + 1) % args.step_interval == 0:
                 model.eval()
+                v_hid, v_mems = None, None
                 vlosses, vaccus, vprecs, vrecas = [], [], [], []
                 for vi, vsfeatures in enumerate(valid_loader):
-                    _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals, vlabels = vsfeatures
+                    if len(vsfeatures[0]) < args.batch_size:
+                        continue
+                    _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, _, vlabels = vsfeatures
                     if use_cuda:
                         vkmer = vkmer.cuda()
                         vbase_means = vbase_means.cuda()
                         vbase_stds = vbase_stds.cuda()
                         vbase_signal_lens = vbase_signal_lens.cuda()
-                        vsignals = vsignals.cuda()
+                        # vsignals = vsignals.cuda()
                         vlabels = vlabels.cuda()
 
-                    voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals)
-                    vloss = criterion(voutputs, vlabels)
+                    if str2bool(args.prehid):
+                        v, vlogits, v_hid, v_mems = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens,
+                                                          hidden=v_hid, mems=v_mems)
+                        if v_hid is not None:
+                            v_hid = repackage_hidden(v_hid)
+                        if v_mems is not None:
+                            v_mems = repackage_hidden(v_mems)
+                    else:
+                        v, vlogits, _, _ = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens,
+                                                 hidden=v_hid, mems=v_mems)
+                    vloss = criterion(v, vlabels)
 
                     _, vpredicted = torch.max(vlogits.data, 1)
 
@@ -161,14 +197,17 @@ def main():
     parser.add_argument('--layer_num', type=int, default=3,
                         required=False, help="encoder layer num")
     parser.add_argument('--class_num', type=int, default=2, required=False)
-    parser.add_argument('--dropout_rate', type=float, default=0.5, required=False)
-    parser.add_argument('--d_model', type=int, default=256, required=False)
-    parser.add_argument('--d_ff', type=int, default=512, required=False)
-    parser.add_argument('--n_head', type=int, default=4, required=False)
-    parser.add_argument('--is_seq', type=str, default='yes', required=False,
-                        help="use seq_module or not, default yes.")
-    parser.add_argument('--is_signal', type=str, default='yes', required=False,
-                        help="use signal_module or not, default yes.")
+    parser.add_argument('--dropout_rate', type=float, default=0.3, required=False)
+    parser.add_argument('--emsize', type=int, default=256,
+                        help='size of word embeddings')
+    parser.add_argument('--nhid', type=int, default=512,
+                        help='number of hidden units per layer')
+    parser.add_argument('--nlayers', type=int, default=3,
+                        help='number of layers')
+    parser.add_argument('--wdrop', type=float, default=0.0,
+                        help='amount of weight dropout to apply to the RNN hidden to hidden matrix')
+    parser.add_argument('--prehid', type=str, default="no", required=False,
+                        help="")
 
     # model training
     parser.add_argument('--batch_size', type=int, default=512, required=False)
@@ -187,6 +226,7 @@ def main():
     parser.add_argument('--tmpdir', type=str, default="/tmp", required=False)
 
     args = parser.parse_args()
+    args.tied = True
 
     print("[main] start..")
     total_start = time.time()
