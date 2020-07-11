@@ -76,13 +76,13 @@ def main():
                              'if abs(prob1-prob0)>=prob_cf, then we use the call. '
                              'range 0-1, default 0.')
     parser.add_argument('--file_uid', type=str, action="store", required=False, default=None,
-                        help='a unique str which all input files has, this is for find all input files  and ignore '
+                        help='a unique str which all input files has, this is for finding all input files and ignoring '
                              'the un-input-files in a input directory. if input_path is a file, ignore this arg.')
     args = parser.parse_args()
 
     input_path = os.path.abspath(args.input_path)
     result_file = args.result_file
-    prob_cf= args.prob_cf
+    prob_cf = args.prob_cf
     file_uid = args.file_uid
 
     mods_files = []
