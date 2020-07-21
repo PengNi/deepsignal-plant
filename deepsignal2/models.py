@@ -3,15 +3,110 @@
 
 import torch
 import torch.nn as nn
+import torch.autograd as autograd
 import math
 
 import torch.utils
 import torch.utils.checkpoint
+
+from utils.constants_torch import use_cuda
+
 tcheckpoint = torch.utils.checkpoint.checkpoint
-#checkpoint = torch.utils.checkpoint.checkpoint
 checkpoint = lambda f, *args, **kwargs: f(*args, **kwargs)
 
 
+def prepare_model_data(abatch, sequence_length, nnembedding):
+    sampleinfo, kmer, base_means, base_stds, base_signal_lens, cent_signals, label = abatch
+    kmer_embed = nnembedding(kmer.long())
+    base_means = torch.reshape(base_means, (-1, sequence_length, 1)).float()
+    base_stds = torch.reshape(base_stds, (-1, sequence_length, 1)).float()
+    base_signal_lens = torch.reshape(base_signal_lens, (-1, sequence_length, 1)).float()
+    brnn_feed = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)
+    # return sampleinfo, brnn_feed, one_hot_embedding(label, num_classes).long()
+    return sampleinfo, brnn_feed, label
+
+
+# BRNN model ==========================================================
+# Bidirectional recurrent neural network, LSTM (many-to-one)
+class SeqBiLSTM(nn.Module):
+    def __init__(self, seq_len=11, num_layers=3, num_classes=2,
+                 dropout_rate=0.5, hidden_size=256, vocab_size=16,
+                 embedding_size=4, is_base=True, is_signallen=True):
+        super(SeqBiLSTM, self).__init__()
+        self.model_type = 'BiLSTM'
+        self.seq_len = seq_len
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
+        self.embed = nn.Embedding(vocab_size, embedding_size)  # for dna/rna base
+        self.is_base = is_base
+        self.is_signallen = is_signallen
+        self.sigfea_num = 3 if self.is_signallen else 2
+        if is_base:
+            self.lstm = nn.LSTM(embedding_size+self.sigfea_num, hidden_size, num_layers,
+                                dropout=dropout_rate, batch_first=True, bidirectional=True)
+        else:
+            self.lstm = nn.LSTM(self.sigfea_num, hidden_size, num_layers,
+                                dropout=dropout_rate, batch_first=True, bidirectional=True)
+
+        self.dropout1 = nn.Dropout(p=dropout_rate)
+        self.fc1 = nn.Linear(hidden_size * 2, hidden_size)  # 2 for bidirection
+        self.fc2 = nn.Linear(hidden_size, num_classes)
+        self.dropout2 = nn.Dropout(p=dropout_rate)
+        self.tanh = nn.Tanh()
+        self.softmax = nn.Softmax(1)
+
+    def init_hidden(self, batch_size):
+        # Set initial states
+        # h0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size)  # 2 for bidirection
+        # c0 = torch.zeros(self.num_layers * 2, batch_size, self.hidden_size)
+        h0 = autograd.Variable(torch.randn(self.num_layers * 2, batch_size, self.hidden_size))
+        c0 = autograd.Variable(torch.randn(self.num_layers * 2, batch_size, self.hidden_size))
+        if use_cuda:
+            h0 = h0.cuda()
+            c0 = c0.cuda()
+        return h0, c0
+
+    def forward(self, kmer, base_means, base_stds, base_signal_lens):
+        base_means = torch.reshape(base_means, (-1, self.seq_len, 1)).float()
+        base_stds = torch.reshape(base_stds, (-1, self.seq_len, 1)).float()
+        base_signal_lens = torch.reshape(base_signal_lens, (-1, self.seq_len, 1)).float()
+        if self.is_base:
+            kmer_embed = self.embed(kmer.long())
+            if self.is_signallen:
+                brnn_feed = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+            else:
+                brnn_feed = torch.cat((kmer_embed, base_means, base_stds), 2)  # (N, L, C)
+        else:
+            if self.is_signallen:
+                brnn_feed = torch.cat((base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+            else:
+                brnn_feed = torch.cat((base_means, base_stds), 2)  # (N, L, C)
+
+        # Forward propagate LSTM
+        # out: tensor of shape (batch_size, seq_length, hidden_size*2)
+        # out, (hn, cn) = self.lstm(brnn_feed, self.init_hidden(brnn_feed.size(0)))
+        out, _ = self.lstm(brnn_feed, self.init_hidden(brnn_feed.size(0)))
+
+        # out = out[:, -1, :]
+        out_fwd_last = out[:, -1, :self.hidden_size]
+        out_bwd_last = out[:, 0, self.hidden_size:]
+        # print(hn[-1].eq(out_bwd_last))
+        # print(hn[-2].eq(out_fwd_last))
+        out = torch.cat((out_fwd_last, out_bwd_last), 1)
+
+        out = self.dropout1(out)
+
+        # Decode the hidden state of the last time step
+        out = self.fc1(out)
+        out = self.dropout2(out)
+        out = self.tanh(out)
+        out = self.fc2(out)
+        # print(out.size())
+
+        return out, self.softmax(out)
+
+
+# Transformer Encoder ========================================
 # Temporarily leave PositionalEncoding module here. Will be moved somewhere else.
 class PositionalEncoding(nn.Module):
     r"""Inject some information about the relative or absolute position of the tokens
@@ -57,74 +152,114 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
-class SeqEncoderClassifier(nn.Module):
+class SeqTransformer(nn.Module):
     """Container module with an encoder, a recurrent or transformer module, and a decoder."""
-
-    def __init__(self, seq_len=11, d_model=512, nhead=8, nhid=2048, nlayers=6, num_classes=2,
-                 dropout=0.5, nvocab=1024, nembed=128):
-        super(SeqEncoderClassifier, self).__init__()
+    def __init__(self, seq_len=11, num_layers=3, num_classes=2,
+                 dropout_rate=0.5, d_model=256, nhead=4, nhid=512,
+                 nvocab=16, nembed=4, is_base=True, is_signallen=True):
+        super(SeqTransformer, self).__init__()
         try:
             from torch.nn import TransformerEncoder, TransformerEncoderLayer
         except:
             raise ImportError('TransformerEncoder module does not exist in PyTorch 1.1 or lower.')
-        self.model_type = 'TransformerEncoder'
-        self.embed = nn.Embedding(nvocab, nembed)
-        self.src_embed = nn.Sequential(nn.Conv1d(in_channels=nembed+3,
-                                                 out_channels=d_model // 2,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model // 2),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
-                                       nn.Conv1d(in_channels=d_model // 2,
-                                                 out_channels=d_model,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
-                                       nn.Conv1d(in_channels=d_model,
-                                                 out_channels=d_model,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1))
-
-        self.src_mask = None
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, nhid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        self.model_type = 'Transformer'
         self.seq_len = seq_len
+        self.num_layers = num_layers
+        self.is_base = is_base
+        self.is_signallen = is_signallen
+        self.sigfea_num = 3 if self.is_signallen else 2
+
         self.d_model = d_model
 
-        self.fc = nn.Linear(self.d_model * self.seq_len, num_classes)
-        self.softmax = nn.Softmax(1)
+        if is_base:
+            self.embed = nn.Embedding(nvocab, nembed)
+            self.src_embed = nn.Sequential(nn.Conv1d(in_channels=nembed+self.sigfea_num,
+                                                     out_channels=self.d_model // 2,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model // 2),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
+                                           nn.Conv1d(in_channels=self.d_model // 2,
+                                                     out_channels=self.d_model,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
+                                           nn.Conv1d(in_channels=self.d_model,
+                                                     out_channels=self.d_model,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1))
+        else:
+            self.src_embed = nn.Sequential(nn.Conv1d(in_channels=self.sigfea_num,
+                                                     out_channels=self.d_model // 2,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model // 2),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
+                                           nn.Conv1d(in_channels=self.d_model // 2,
+                                                     out_channels=self.d_model,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
+                                           nn.Conv1d(in_channels=self.d_model,
+                                                     out_channels=self.d_model,
+                                                     kernel_size=3,
+                                                     stride=1,
+                                                     padding=1,
+                                                     bias=False),
+                                           nn.BatchNorm1d(num_features=self.d_model),
+                                           nn.ReLU(inplace=True),
+                                           nn.MaxPool1d(kernel_size=3, stride=1, padding=1))
 
-        # self.init_weights()
+        self.src_mask = None
+        self.pos_encoder = PositionalEncoding(self.d_model, dropout_rate)
+        encoder_layers = TransformerEncoderLayer(self.d_model, nhead, nhid, dropout_rate)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, num_layers)
+
+        self.decoder1 = nn.Linear(self.d_model * self.seq_len, self.d_model)
+        self.dropout = nn.Dropout(dropout_rate)
+        self.tanh = nn.Tanh()
+        self.decoder2 = nn.Linear(self.d_model, num_classes)
+        self.softmax = nn.Softmax(1)
 
     def _generate_square_subsequent_mask(self, sz):
         mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 
-    def init_weights(self):
-        initrange = 0.1
-        self.embed.weight.data.uniform_(-initrange, initrange)
-
     def forward(self, kmer, base_means, base_stds, base_signal_lens, has_mask=True):
-
-        kmer_embed = self.embed(kmer.long())
         base_means = torch.reshape(base_means, (-1, self.seq_len, 1)).float()
         base_stds = torch.reshape(base_stds, (-1, self.seq_len, 1)).float()
         base_signal_lens = torch.reshape(base_signal_lens, (-1, self.seq_len, 1)).float()
-        out = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+        if self.is_base:
+            kmer_embed = self.embed(kmer.long())
+            if self.is_signallen:
+                out = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+            else:
+                out = torch.cat((kmer_embed, base_means, base_stds), 2)  # (N, L, C)
+        else:
+            if self.is_signallen:
+                out = torch.cat((base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+            else:
+                out = torch.cat((base_means, base_stds), 2)  # (N, L, C)
 
         out = out.transpose(-1, -2)  # (N, C, L)
         out = self.src_embed(out)  # (N, C, L)
@@ -141,127 +276,12 @@ class SeqEncoderClassifier(nn.Module):
             self.src_mask = None
 
         out = self.transformer_encoder(out, self.src_mask)  # (L, N, C)
-        out = out.transpose(0, 1)
-        # out = self.fc(out.reshape(out.size(0), -1))
-        # return out, self.softmax(out)
-        return out.reshape(out.size(0), -1)
+        out = out.transpose(0, 1)  # (N, L, C)
+        out = out.reshape(out.size(0), -1)
 
-
-class SignalEncoderClassifier(nn.Module):
-    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
-
-    def __init__(self, signal_len=128, d_model=512, nhead=8, nhid=2048, nlayers=6, num_classes=2,
-                 dropout=0.5):
-        super(SignalEncoderClassifier, self).__init__()
-        try:
-            from torch.nn import TransformerEncoder, TransformerEncoderLayer
-        except:
-            raise ImportError('TransformerEncoder module does not exist in PyTorch 1.1 or lower.')
-        self.model_type = 'TransformerEncoder'
-        self.src_embed = nn.Sequential(nn.Conv1d(in_channels=1,
-                                                 out_channels=d_model // 2,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model // 2),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
-                                       nn.Conv1d(in_channels=d_model // 2,
-                                                 out_channels=d_model,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1),
-                                       nn.Conv1d(in_channels=d_model,
-                                                 out_channels=d_model,
-                                                 kernel_size=3,
-                                                 stride=1,
-                                                 padding=1,
-                                                 bias=False),
-                                       nn.BatchNorm1d(num_features=d_model),
-                                       nn.ReLU(inplace=True),
-                                       nn.MaxPool1d(kernel_size=3, stride=1, padding=1))
-        self.src_mask = None
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, nhid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.signal_len = signal_len
-        self.d_model = d_model
-
-        self.fc = nn.Linear(self.d_model * self.signal_len, num_classes)
-        self.softmax = nn.Softmax(1)
-
-    def _generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
-
-    def forward(self, signals, has_mask=True):
-
-        out = signals.reshape(-1, signals.size(1), 1).float()  # (N, L, C)
-
-        out = out.transpose(-1, -2)  # (N, C, L)
-        out = self.src_embed(out)  # (N, C, L)
-        out = out.transpose(-1, -2)  # (N, L, C)
-        out = out.transpose(0, 1)  # (L, N, C)
-        out = self.pos_encoder(out)  # (L, N, C)
-
-        if has_mask:
-            device = out.device
-            if self.src_mask is None or self.src_mask.size(0) != len(out):
-                mask = self._generate_square_subsequent_mask(len(out)).to(device)
-                self.src_mask = mask
-        else:
-            self.src_mask = None
-
-        out = self.transformer_encoder(out, self.src_mask)  # (L, N, C)
-        out = out.transpose(0, 1)
-        # out = self.fc(out.reshape(out.size(0), -1))
-        # return out, self.softmax(out)
-        return out.reshape(out.size(0), -1)
-
-
-class EncoderClassifier(nn.Module):
-    def __init__(self, seq_len=11, signal_len=128, d_model=512, nhead=8, nhid=2048, nlayers=6, num_classes=2,
-                 dropout=0.5, nvocab=5, nembed=5, is_seq=True, is_signal=True):
-        super(EncoderClassifier, self).__init__()
-        assert(is_seq | is_signal is True)
-        try:
-            from torch.nn import TransformerEncoder, TransformerEncoderLayer
-        except:
-            raise ImportError('TransformerEncoder module does not exist in PyTorch 1.1 or lower.')
-        self.model_type = 'TransformerEncoder'
-        self.seq_len = seq_len
-        self.signal_len = signal_len
-        self.d_model = d_model
-        self.is_seq = is_seq
-        self.is_signal = is_signal
-
-        self.seq_encoder = SeqEncoderClassifier(seq_len, d_model, nhead, nhid, nlayers,
-                                                num_classes, dropout, nvocab, nembed)
-        self.signal_encoder = SignalEncoderClassifier(signal_len, d_model, nhead, nhid, nlayers,
-                                                      num_classes, dropout)
-
-        self.fc_seq = nn.Linear(self.d_model * self.seq_len, num_classes)
-        self.fc_signal = nn.Linear(self.d_model * self.signal_len, num_classes)
-        self.fc = nn.Linear(self.d_model * (self.signal_len + self.seq_len), num_classes)
-        self.softmax = nn.Softmax(1)
-
-    def forward(self, kmer, base_means, base_stds, base_signal_lens, signals, has_mask=True):
-
-        if self.is_seq and not self.is_signal:
-            out = self.seq_encoder(kmer, base_means, base_stds, base_signal_lens, has_mask)
-            out = self.fc_seq(out)
-        elif self.is_signal and not self.is_seq:
-            out = self.signal_encoder(signals, has_mask)
-            out = self.fc_signal(out)
-        else:
-            out_seq = self.seq_encoder(kmer, base_means, base_stds, base_signal_lens, has_mask)
-            out_signal = self.seq_encoder(kmer, base_means, base_stds, base_signal_lens, has_mask)
-            out = torch.cat((out_seq, out_signal), 1)
-            out = self.fc(out)
+        # output logits
+        out = self.decoder1(out)
+        out = self.dropout(out)
+        out = self.tanh(out)
+        out = self.decoder2(out)
         return out, self.softmax(out)

@@ -26,7 +26,8 @@ except RuntimeError:
 from torch.multiprocessing import Queue
 import time
 
-from models import EncoderClassifier
+from models import SeqBiLSTM
+from models import SeqTransformer
 from utils.process_utils import base2code_dna
 from utils.process_utils import code2base_dna
 from utils.process_utils import str2bool
@@ -100,9 +101,10 @@ def _call_mods(features_batch, model):
             vbase_means = vbase_means.cuda()
             vbase_stds = vbase_stds.cuda()
             vbase_signal_lens = vbase_signal_lens.cuda()
-            vcent_signals = vcent_signals.cuda()
+            # vcent_signals = vcent_signals.cuda()
 
-        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vcent_signals)
+        # voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vcent_signals)
+        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens)
         _, vpredicted = torch.max(vlogits.data, 1)
         if use_cuda:
             vlogits = vlogits.cpu()
@@ -128,10 +130,17 @@ def _call_mods(features_batch, model):
 
 
 def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
-
-    model = EncoderClassifier(args.seq_len, args.signal_len, args.d_model, args.n_head, args.d_ff,
-                              args.layer_num, args.class_num, args.dropout_rate,
-                              is_seq=str2bool(args.is_seq), is_signal=str2bool(args.is_signal))
+    if args.model_type == "BiLSTM":
+        model = SeqBiLSTM(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                          args.hid_rnn, args.n_vocab, args.n_embed, is_base=str2bool(args.is_base),
+                          is_signallen=str2bool(args.is_signallen))
+    elif args.model_type == "Transformer":
+        model = SeqTransformer(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                               args.d_model, args.n_head, args.hid_trans, args.n_vocab,
+                               args.n_embed, is_base=str2bool(args.is_base),
+                               is_signallen=str2bool(args.is_signallen))
+    else:
+        raise ValueError("model type is not right!")
     if use_cuda:
         model = model.cuda()
 
@@ -289,9 +298,17 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
 def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
                             motif_seqs, chrom2len, model_path, positions, args):
-    model = EncoderClassifier(args.seq_len, args.signal_len, args.d_model, args.n_head, args.d_ff,
-                              args.layer_num, args.class_num, args.dropout_rate,
-                              is_seq=str2bool(args.is_seq), is_signal=str2bool(args.is_signal))
+    if args.model_type == "BiLSTM":
+        model = SeqBiLSTM(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                          args.hid_rnn, args.n_vocab, args.n_embed, is_base=str2bool(args.is_base),
+                          is_signallen=str2bool(args.is_signallen))
+    elif args.model_type == "Transformer":
+        model = SeqTransformer(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                               args.d_model, args.n_head, args.hid_trans, args.n_vocab,
+                               args.n_embed, is_base=str2bool(args.is_base),
+                               is_signallen=str2bool(args.is_signallen))
+    else:
+        raise ValueError("model type is not right!")
     # this function is designed for CPU, disable cuda
     # if use_cuda:
     #     model = model.cuda()
@@ -455,22 +472,37 @@ def main():
     p_call.add_argument("--model_path", "-m", action="store", type=str, required=True,
                         help="file path of the trained model (.ckpt)")
 
+    # model input
+    p_call.add_argument('--model_type', type=str, default="BiLSTM", choices=["BiLSTM", "Transformer"],
+                        required=False, help="type of model to use, 'BiLSTM' or 'Transformer'")
     p_call.add_argument('--seq_len', type=int, default=11, required=False)
     p_call.add_argument('--signal_len', type=int, default=128, required=False)
+    p_call.add_argument('--is_base', type=str, default="yes", required=False,
+                        help="is using base features, default yes")
+    parser.add_argument('--is_signallen', type=str, default="yes", required=False,
+                        help="is using signal length feature of each base, default yes")
+
+    # model param
     p_call.add_argument('--layer_num', type=int, default=3,
-                        required=False, help="encoder layer num")
-    p_call.add_argument('--dropout_rate', type=float, default=0.5, required=False)
+                        required=False, help="bilstm/encoder layer num")
+    p_call.add_argument('--class_num', type=int, default=2, required=False)
+    p_call.add_argument('--dropout_rate', type=float, default=0, required=False)
+    p_call.add_argument('--n_vocab', type=int, default=16, required=False,
+                        help="base_seq vocab_size")
+    p_call.add_argument('--n_embed', type=int, default=4, required=False,
+                        help="base_seq embedding_size")
     p_call.add_argument("--batch_size", "-b", default=512, type=int, required=False,
                         action="store", help="batch size, default 512")
-    p_call.add_argument("--class_num", "-c", action="store", default=2, type=int, required=False,
-                        help="class num, default 2")
+
+    # BiLSTM model param
+    p_call.add_argument('--hid_rnn', type=int, default=256, required=False,
+                        help="BiLSTM hidden_size")
+
+    # transformer model param
     p_call.add_argument('--d_model', type=int, default=256, required=False)
-    p_call.add_argument('--d_ff', type=int, default=512, required=False)
+    p_call.add_argument('--hid_trans', type=int, default=512, required=False,
+                        help="transfomer encoder hidden size")
     p_call.add_argument('--n_head', type=int, default=4, required=False)
-    p_call.add_argument('--is_seq', type=str, default='yes', required=False,
-                        help="use seq_module or not, default yes.")
-    p_call.add_argument('--is_signal', type=str, default='yes', required=False,
-                        help="use signal_module or not, default yes.")
 
     p_output = parser.add_argument_group("OUTPUT")
     p_output.add_argument("--result_file", "-o", action="store", type=str, required=True,

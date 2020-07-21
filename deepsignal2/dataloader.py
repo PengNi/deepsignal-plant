@@ -7,6 +7,11 @@ base2code_dna = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 4}
 code2base_dna = {0: 'A', 1: 'C', 2: 'G', 3: 'T', 4: 'N'}
 
 
+def clear_linecache():
+    # linecache should be treated carefully
+    linecache.clearcache()
+
+
 def parse_a_line(line):
     words = line.strip().split("\t")
 
@@ -24,6 +29,9 @@ def parse_a_line(line):
 
 class SignalFeaData(Dataset):
     def __init__(self, filename, transform=None):
+        print(">>>using linecache to access '{}'<<<\n"
+              ">>>after done using the file, "
+              "remember to use linecache.clearcache() to clear cache for safety<<<".format(filename))
         self._filename = os.path.abspath(filename)
         self._total_data = 0
         self._transform = transform

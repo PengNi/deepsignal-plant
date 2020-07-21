@@ -10,8 +10,10 @@ import sys
 import time
 import re
 
-from models import EncoderClassifier
+from models import SeqBiLSTM
+from models import SeqTransformer
 from dataloader import SignalFeaData
+from dataloader import clear_linecache
 from utils.process_utils import display_args
 from utils.process_utils import str2bool
 
@@ -20,7 +22,7 @@ from utils.constants_torch import use_cuda
 
 def train(args):
     total_start = time.time()
-    torch.manual_seed(args.seed)
+    # torch.manual_seed(args.seed)
 
     print("[train]start..")
     if use_cuda:
@@ -37,10 +39,10 @@ def train(args):
     valid_dataset = SignalFeaData(args.valid_file)
     valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset,
                                                batch_size=args.batch_size,
-                                               shuffle=True)
+                                               shuffle=False)
 
     model_dir = args.model_dir
-    model_regex = re.compile(r"epoch\d+\.ckpt*")
+    model_regex = re.compile(r"" + args.model_type + "\." + "epoch\d+\.ckpt*")
     if model_dir != "/":
         model_dir = os.path.abspath(model_dir).rstrip("/")
         if not os.path.exists(model_dir):
@@ -50,10 +52,17 @@ def train(args):
                 if model_regex.match(mfile):
                     os.remove(model_dir + "/" + mfile)
         model_dir += "/"
-
-    model = EncoderClassifier(args.seq_len, args.signal_len, args.d_model, args.n_head, args.d_ff,
-                              args.layer_num, args.class_num, args.dropout_rate, is_seq=str2bool(args.is_seq),
-                              is_signal=str2bool(args.is_signal))
+    if args.model_type == "BiLSTM":
+        model = SeqBiLSTM(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                          args.hid_rnn, args.n_vocab, args.n_embed, is_base=str2bool(args.is_base),
+                          is_signallen=str2bool(args.is_signallen))
+    elif args.model_type == "Transformer":
+        model = SeqTransformer(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
+                               args.d_model, args.n_head, args.hid_trans, args.n_vocab,
+                               args.n_embed, is_base=str2bool(args.is_base),
+                               is_signallen=str2bool(args.is_signallen))
+    else:
+        raise ValueError("model type is not right!")
     if use_cuda:
         model = model.cuda()
 
@@ -62,81 +71,94 @@ def train(args):
     if use_cuda:
         weight_rank = weight_rank.cuda()
     criterion = nn.CrossEntropyLoss(weight=weight_rank)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    if args.optim_type == "Adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    elif args.optim_type == "RMSprop":
+        optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr)
+    elif args.optim_type == "SGD":
+        optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.8)
+    else:
+        raise ValueError("optim_type is not right!")
     scheduler = StepLR(optimizer, step_size=2, gamma=0.1)
 
     # Train the model
     total_step = len(train_loader)
     print("total_step: {}".format(total_step))
-    start = time.time()
     curr_best_accuracy = 0
+    model.train()
     for epoch in range(args.max_epoch_num):
         curr_best_accuracy_epoch = 0
+        tlosses = []
+        start = time.time()
         for i, sfeatures in enumerate(train_loader):
-            _, kmer, base_means, base_stds, base_signal_lens, signals, labels = sfeatures
+            _, kmer, base_means, base_stds, base_signal_lens, _, labels = sfeatures
             if use_cuda:
                 kmer = kmer.cuda()
                 base_means = base_means.cuda()
                 base_stds = base_stds.cuda()
                 base_signal_lens = base_signal_lens.cuda()
-                signals = signals.cuda()
+                # signals = signals.cuda()
                 labels = labels.cuda()
 
-            model.train()
-
             # Forward pass
-            outputs, _ = model(kmer, base_means, base_stds, base_signal_lens, signals)
+            outputs, logits = model(kmer, base_means, base_stds, base_signal_lens)
             loss = criterion(outputs, labels)
+            tlosses.append(loss.detach().item())
 
             # Backward and optimize
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
             if (i + 1) % args.step_interval == 0:
                 model.eval()
-                vlosses, vaccus, vprecs, vrecas = [], [], [], []
-                for vi, vsfeatures in enumerate(valid_loader):
-                    _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals, vlabels = vsfeatures
-                    if use_cuda:
-                        vkmer = vkmer.cuda()
-                        vbase_means = vbase_means.cuda()
-                        vbase_stds = vbase_stds.cuda()
-                        vbase_signal_lens = vbase_signal_lens.cuda()
-                        vsignals = vsignals.cuda()
-                        vlabels = vlabels.cuda()
+                with torch.no_grad():
+                    vlosses, vaccus, vprecs, vrecas = [], [], [], []
+                    for vi, vsfeatures in enumerate(valid_loader):
+                        _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, _, vlabels = vsfeatures
+                        if use_cuda:
+                            vkmer = vkmer.cuda()
+                            vbase_means = vbase_means.cuda()
+                            vbase_stds = vbase_stds.cuda()
+                            vbase_signal_lens = vbase_signal_lens.cuda()
+                            # vsignals = vsignals.cuda()
+                            vlabels = vlabels.cuda()
 
-                    voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals)
-                    vloss = criterion(voutputs, vlabels)
+                        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens)
+                        vloss = criterion(voutputs, vlabels)
 
-                    _, vpredicted = torch.max(vlogits.data, 1)
+                        _, vpredicted = torch.max(vlogits.data, 1)
 
-                    if use_cuda:
-                        vlabels = vlabels.cpu()
-                        vpredicted = vpredicted.cpu()
-                    i_accuracy = metrics.accuracy_score(vlabels.numpy(), vpredicted)
-                    i_precision = metrics.precision_score(vlabels.numpy(), vpredicted)
-                    i_recall = metrics.recall_score(vlabels.numpy(), vpredicted)
+                        if use_cuda:
+                            vlabels = vlabels.cpu()
+                            vpredicted = vpredicted.cpu()
+                        i_accuracy = metrics.accuracy_score(vlabels.numpy(), vpredicted)
+                        i_precision = metrics.precision_score(vlabels.numpy(), vpredicted)
+                        i_recall = metrics.recall_score(vlabels.numpy(), vpredicted)
 
-                    vaccus.append(i_accuracy)
-                    vprecs.append(i_precision)
-                    vrecas.append(i_recall)
-                    vlosses.append(vloss.item())
+                        vaccus.append(i_accuracy)
+                        vprecs.append(i_precision)
+                        vrecas.append(i_recall)
+                        vlosses.append(vloss.item())
 
-                if np.mean(vaccus) > curr_best_accuracy_epoch:
-                    curr_best_accuracy_epoch = np.mean(vaccus)
-                    if curr_best_accuracy_epoch > curr_best_accuracy - 0.001:
-                        torch.save(model.state_dict(), model_dir + 'epoch{}.ckpt'.format(epoch))
+                    if np.mean(vaccus) > curr_best_accuracy_epoch:
+                        curr_best_accuracy_epoch = np.mean(vaccus)
+                        if curr_best_accuracy_epoch > curr_best_accuracy - 0.001:
+                            torch.save(model.state_dict(), model_dir + args.model_type + '.epoch{}.ckpt'.format(epoch))
 
-                time_cost = time.time() - start
-                print('Epoch [{}/{}], Step [{}/{}], ValidSet Loss: {:.4f}, '
-                      'Accuracy: {:.4f}, Precision: {:.4f}, Recall: {:.4f}, '
-                      'curr_epoch_best_accuracy: {:.4f}, Time: {:.2f}s'
-                      .format(epoch + 1, args.max_epoch_num, i + 1, total_step, np.mean(vlosses),
-                              np.mean(vaccus), np.mean(vprecs), np.mean(vrecas),
-                              curr_best_accuracy_epoch, time_cost))
-                start = time.time()
-                sys.stdout.flush()
+                    time_cost = time.time() - start
+                    print('Epoch [{}/{}], Step [{}/{}], TrainLoss: {:.4f}; '
+                          'ValidLoss: {:.4f}, '
+                          'Accuracy: {:.4f}, Precision: {:.4f}, Recall: {:.4f}, '
+                          'curr_epoch_best_accuracy: {:.4f}; Time: {:.2f}s'
+                          .format(epoch + 1, args.max_epoch_num, i + 1, total_step, np.mean(tlosses),
+                                  np.mean(vlosses), np.mean(vaccus), np.mean(vprecs), np.mean(vrecas),
+                                  curr_best_accuracy_epoch, time_cost))
+                    tlosses = []
+                    start = time.time()
+                    sys.stdout.flush()
+                model.train()
         scheduler.step()
         if curr_best_accuracy_epoch > curr_best_accuracy:
             curr_best_accuracy = curr_best_accuracy_epoch
@@ -146,6 +168,7 @@ def train(args):
                 break
 
     endtime = time.time()
+    clear_linecache()
     print("[train]training cost {} seconds".format(endtime - total_start))
 
 
@@ -155,20 +178,37 @@ def main():
     parser.add_argument('--valid_file', type=str, required=True)
     parser.add_argument('--model_dir', type=str, required=True)
 
-    # model param
+    # model input
+    parser.add_argument('--model_type', type=str, default="BiLSTM", choices=["BiLSTM", "Transformer"],
+                        required=False, help="type of model to use, 'BiLSTM' or 'Transformer', default BiLSTM")
     parser.add_argument('--seq_len', type=int, default=11, required=False)
     parser.add_argument('--signal_len', type=int, default=128, required=False)
+    parser.add_argument('--is_base', type=str, default="yes", required=False,
+                        help="is using base features, default yes")
+    parser.add_argument('--is_signallen', type=str, default="yes", required=False,
+                        help="is using signal length feature of each base, default yes")
+
+    # model param
     parser.add_argument('--layer_num', type=int, default=3,
-                        required=False, help="encoder layer num")
+                        required=False, help="bilstm/encoder layer num")
     parser.add_argument('--class_num', type=int, default=2, required=False)
     parser.add_argument('--dropout_rate', type=float, default=0.5, required=False)
+    parser.add_argument('--n_vocab', type=int, default=16, required=False,
+                        help="base_seq vocab_size (15 base kinds from iupac)")
+    parser.add_argument('--n_embed', type=int, default=4, required=False,
+                        help="base_seq embedding_size")
+    parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],
+                        required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop', default Adam")
+
+    # BiLSTM model param
+    parser.add_argument('--hid_rnn', type=int, default=256, required=False,
+                        help="BiLSTM hidden_size")
+
+    # transformer model param
     parser.add_argument('--d_model', type=int, default=256, required=False)
-    parser.add_argument('--d_ff', type=int, default=512, required=False)
+    parser.add_argument('--hid_trans', type=int, default=512, required=False,
+                        help="transfomer encoder hidden size")
     parser.add_argument('--n_head', type=int, default=4, required=False)
-    parser.add_argument('--is_seq', type=str, default='yes', required=False,
-                        help="use seq_module or not, default yes.")
-    parser.add_argument('--is_signal', type=str, default='yes', required=False,
-                        help="use signal_module or not, default yes.")
 
     # model training
     parser.add_argument('--batch_size', type=int, default=512, required=False)
@@ -180,8 +220,8 @@ def main():
     parser.add_argument('--step_interval', type=int, default=100, required=False)
 
     parser.add_argument('--pos_weight', type=float, default=1.0, required=False)
-    parser.add_argument('--seed', type=int, default=1234,
-                        help='random seed')
+    # parser.add_argument('--seed', type=int, default=1234,
+    #                     help='random seed')
 
     # else
     parser.add_argument('--tmpdir', type=str, default="/tmp", required=False)
