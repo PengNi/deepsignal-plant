@@ -10,8 +10,7 @@ import sys
 import time
 import re
 
-from models import SeqBiLSTM
-from models import SeqTransformer
+from models import ModelBiLSTM
 from dataloader import SignalFeaData
 from dataloader import clear_linecache
 from utils.process_utils import display_args
@@ -52,17 +51,12 @@ def train(args):
                 if model_regex.match(mfile):
                     os.remove(model_dir + "/" + mfile)
         model_dir += "/"
-    if args.model_type == "BiLSTM":
-        model = SeqBiLSTM(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
-                          args.hid_rnn, args.n_vocab, args.n_embed, is_base=str2bool(args.is_base),
-                          is_signallen=str2bool(args.is_signallen))
-    elif args.model_type == "Transformer":
-        model = SeqTransformer(args.seq_len, args.layer_num, args.class_num, args.dropout_rate,
-                               args.d_model, args.n_head, args.hid_trans, args.n_vocab,
-                               args.n_embed, is_base=str2bool(args.is_base),
-                               is_signallen=str2bool(args.is_signallen))
-    else:
-        raise ValueError("model type is not right!")
+
+    model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum_seq, args.layernum_signal,
+                        args.class_num, args.dropout_rate, args.hid_rnn,
+                        args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
+                        args.out_channels,
+                        args.model_type)
     if use_cuda:
         model = model.cuda()
 
@@ -91,17 +85,17 @@ def train(args):
         tlosses = []
         start = time.time()
         for i, sfeatures in enumerate(train_loader):
-            _, kmer, base_means, base_stds, base_signal_lens, _, labels = sfeatures
+            _, kmer, base_means, base_stds, base_signal_lens, signals, labels = sfeatures
             if use_cuda:
                 kmer = kmer.cuda()
                 base_means = base_means.cuda()
                 base_stds = base_stds.cuda()
                 base_signal_lens = base_signal_lens.cuda()
-                # signals = signals.cuda()
+                signals = signals.cuda()
                 labels = labels.cuda()
 
             # Forward pass
-            outputs, logits = model(kmer, base_means, base_stds, base_signal_lens)
+            outputs, logits = model(kmer, base_means, base_stds, base_signal_lens, signals)
             loss = criterion(outputs, labels)
             tlosses.append(loss.detach().item())
 
@@ -116,16 +110,15 @@ def train(args):
                 with torch.no_grad():
                     vlosses, vaccus, vprecs, vrecas = [], [], [], []
                     for vi, vsfeatures in enumerate(valid_loader):
-                        _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, _, vlabels = vsfeatures
+                        _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals, vlabels = vsfeatures
                         if use_cuda:
                             vkmer = vkmer.cuda()
                             vbase_means = vbase_means.cuda()
                             vbase_stds = vbase_stds.cuda()
                             vbase_signal_lens = vbase_signal_lens.cuda()
-                            # vsignals = vsignals.cuda()
+                            vsignals = vsignals.cuda()
                             vlabels = vlabels.cuda()
-
-                        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens)
+                        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals)
                         vloss = criterion(voutputs, vlabels)
 
                         _, vpredicted = torch.max(vlogits.data, 1)
@@ -179,30 +172,35 @@ def main():
     parser.add_argument('--model_dir', type=str, required=True)
 
     # model input
-    parser.add_argument('--model_type', type=str, default="BiLSTM", choices=["BiLSTM", "Transformer"],
-                        required=False, help="type of model to use, 'BiLSTM' or 'Transformer', default BiLSTM")
+    parser.add_argument('--model_type', type=str, default="both",
+                        choices=["both_bilstm", "seq_bilstm", "signal_bilstm"],
+                        required=False,
+                        help="type of model to use, 'both_bilstm', 'seq_bilstm' or 'signal_bilstm', "
+                             "'both_bilstm' means to use both seq and signal bilstm, default: both_bilstm")
     parser.add_argument('--seq_len', type=int, default=11, required=False)
     parser.add_argument('--signal_len', type=int, default=128, required=False)
-    parser.add_argument('--is_base', type=str, default="yes", required=False,
-                        help="is using base features, default yes")
-    parser.add_argument('--is_signallen', type=str, default="yes", required=False,
-                        help="is using signal length feature of each base, default yes")
 
     # model param
-    parser.add_argument('--layer_num', type=int, default=3,
-                        required=False, help="bilstm/encoder layer num")
+    parser.add_argument('--layernum_seq', type=int, default=3,
+                        required=False, help="layer num for Sequence Feature, default 3")
+    parser.add_argument('--layernum_signal', type=int, default=2,
+                        required=False, help="layer num for Signal Feature, default 2")
     parser.add_argument('--class_num', type=int, default=2, required=False)
     parser.add_argument('--dropout_rate', type=float, default=0.5, required=False)
     parser.add_argument('--n_vocab', type=int, default=16, required=False,
                         help="base_seq vocab_size (15 base kinds from iupac)")
     parser.add_argument('--n_embed', type=int, default=4, required=False,
                         help="base_seq embedding_size")
-    parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],
-                        required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop', default Adam")
+    parser.add_argument('--is_base', type=str, default="yes", required=False,
+                        help="is using base features in seq model, default yes")
+    parser.add_argument('--is_signallen', type=str, default="yes", required=False,
+                        help="is using signal length feature of each base in seq model, default yes")
 
     # BiLSTM model param
     parser.add_argument('--hid_rnn', type=int, default=256, required=False,
                         help="BiLSTM hidden_size")
+    parser.add_argument('--out_channels', type=int, default=128, required=False,
+                        help="SignalBiLSTM signal out_channels")
 
     # transformer model param
     parser.add_argument('--d_model', type=int, default=256, required=False)
@@ -211,6 +209,8 @@ def main():
     parser.add_argument('--n_head', type=int, default=4, required=False)
 
     # model training
+    parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],
+                        required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop', default Adam")
     parser.add_argument('--batch_size', type=int, default=512, required=False)
     parser.add_argument('--lr', type=float, default=0.001, required=False)
     parser.add_argument("--max_epoch_num", action="store", default=10, type=int,
