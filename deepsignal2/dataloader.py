@@ -12,7 +12,7 @@ def clear_linecache():
     linecache.clearcache()
 
 
-def parse_a_line(line):
+def parse_a_line2(line):
     words = line.strip().split("\t")
 
     sampleinfo = "\t".join(words[0:6])
@@ -21,13 +21,13 @@ def parse_a_line(line):
     base_means = np.array([float(x) for x in words[7].split(",")])
     base_stds = np.array([float(x) for x in words[8].split(",")])
     base_signal_lens = np.array([int(x) for x in words[9].split(",")])
-    cent_signals = np.array([float(x) for x in words[10].split(",")])
+    k_signals = np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")])
     label = int(words[11])
 
-    return sampleinfo, kmer, base_means, base_stds, base_signal_lens, cent_signals, label
+    return sampleinfo, kmer, base_means, base_stds, base_signal_lens, k_signals, label
 
 
-class SignalFeaData(Dataset):
+class SignalFeaData2(Dataset):
     def __init__(self, filename, transform=None):
         print(">>>using linecache to access '{}'<<<\n"
               ">>>after done using the file, "
@@ -43,7 +43,7 @@ class SignalFeaData(Dataset):
         if line == "":
             return None
         else:
-            output = parse_a_line(line)
+            output = parse_a_line2(line)
             if self._transform is not None:
                 output = self._transform(output)
             return output

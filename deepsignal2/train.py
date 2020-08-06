@@ -11,7 +11,7 @@ import time
 import re
 
 from models import ModelBiLSTM
-from dataloader import SignalFeaData
+from dataloader import SignalFeaData2
 from dataloader import clear_linecache
 from utils.process_utils import display_args
 from utils.process_utils import str2bool
@@ -30,12 +30,12 @@ def train(args):
         print("GPU is not available!")
 
     print("reading data..")
-    train_dataset = SignalFeaData(args.train_file)
+    train_dataset = SignalFeaData2(args.train_file)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
                                                batch_size=args.batch_size,
                                                shuffle=True)
 
-    valid_dataset = SignalFeaData(args.valid_file)
+    valid_dataset = SignalFeaData2(args.valid_file)
     valid_loader = torch.utils.data.DataLoader(dataset=valid_dataset,
                                                batch_size=args.batch_size,
                                                shuffle=False)
@@ -52,10 +52,9 @@ def train(args):
                     os.remove(model_dir + "/" + mfile)
         model_dir += "/"
 
-    model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum_seq, args.layernum_signal,
-                        args.class_num, args.dropout_rate, args.hid_rnn,
+    model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
+                        args.dropout_rate, args.hid_rnn,
                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
-                        args.out_channels,
                         args.model_type)
     if use_cuda:
         model = model.cuda()
@@ -138,7 +137,10 @@ def train(args):
                     if np.mean(vaccus) > curr_best_accuracy_epoch:
                         curr_best_accuracy_epoch = np.mean(vaccus)
                         if curr_best_accuracy_epoch > curr_best_accuracy - 0.001:
-                            torch.save(model.state_dict(), model_dir + args.model_type + '.epoch{}.ckpt'.format(epoch))
+                            torch.save(model.state_dict(),
+                                       model_dir + args.model_type + '.b{}_s{}_epoch{}.ckpt'.format(args.seq_len,
+                                                                                                    args.signal_len,
+                                                                                                    epoch))
 
                     time_cost = time.time() - start
                     print('Epoch [{}/{}], Step [{}/{}], TrainLoss: {:.4f}; '
@@ -172,19 +174,20 @@ def main():
     parser.add_argument('--model_dir', type=str, required=True)
 
     # model input
-    parser.add_argument('--model_type', type=str, default="both",
+    parser.add_argument('--model_type', type=str, default="both_bilstm",
                         choices=["both_bilstm", "seq_bilstm", "signal_bilstm"],
                         required=False,
                         help="type of model to use, 'both_bilstm', 'seq_bilstm' or 'signal_bilstm', "
                              "'both_bilstm' means to use both seq and signal bilstm, default: both_bilstm")
     parser.add_argument('--seq_len', type=int, default=11, required=False)
-    parser.add_argument('--signal_len', type=int, default=128, required=False)
+    parser.add_argument('--signal_len', type=int, default=16, required=False,
+                        help="the number of signals of one base to be used in deepsignal, default 16")
 
     # model param
-    parser.add_argument('--layernum_seq', type=int, default=3,
-                        required=False, help="layer num for Sequence Feature, default 3")
-    parser.add_argument('--layernum_signal', type=int, default=2,
-                        required=False, help="layer num for Signal Feature, default 2")
+    parser.add_argument('--layernum1', type=int, default=3,
+                        required=False, help="lstm layer num for combined feature, default 3")
+    parser.add_argument('--layernum2', type=int, default=1,
+                        required=False, help="lstm layer num for seq feature (and for signal feature too), default 1")
     parser.add_argument('--class_num', type=int, default=2, required=False)
     parser.add_argument('--dropout_rate', type=float, default=0.5, required=False)
     parser.add_argument('--n_vocab', type=int, default=16, required=False,
@@ -198,15 +201,7 @@ def main():
 
     # BiLSTM model param
     parser.add_argument('--hid_rnn', type=int, default=256, required=False,
-                        help="BiLSTM hidden_size")
-    parser.add_argument('--out_channels', type=int, default=128, required=False,
-                        help="SignalBiLSTM signal out_channels")
-
-    # transformer model param
-    parser.add_argument('--d_model', type=int, default=256, required=False)
-    parser.add_argument('--hid_trans', type=int, default=512, required=False,
-                        help="transfomer encoder hidden size")
-    parser.add_argument('--n_head', type=int, default=4, required=False)
+                        help="BiLSTM hidden_size for combined feature")
 
     # model training
     parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],

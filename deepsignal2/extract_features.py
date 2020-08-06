@@ -142,43 +142,59 @@ def _normalize_signals(signals, normalize_method="mad"):
     return np.around(norm_signals, decimals=6)
 
 
-def _get_central_signals(signals_list, rawsignal_num=360):
-    signal_lens = [len(x) for x in signals_list]
+# def _get_central_signals(signals_list, rawsignal_num=360):
+#     signal_lens = [len(x) for x in signals_list]
+#
+#     if sum(signal_lens) < rawsignal_num:
+#         # real_signals = sum(signals_list, [])
+#         real_signals = np.concatenate(signals_list)
+#         cent_signals = np.append(real_signals, np.array([0] * (rawsignal_num - len(real_signals))))
+#     else:
+#         mid_loc = int((len(signals_list) - 1) / 2)
+#         mid_base_len = len(signals_list[mid_loc])
+#
+#         if mid_base_len >= rawsignal_num:
+#             allcentsignals = signals_list[mid_loc]
+#             cent_signals = [allcentsignals[x] for x in sorted(random.sample(range(len(allcentsignals)),
+#                                                                             rawsignal_num))]
+#         else:
+#             left_len = (rawsignal_num - mid_base_len) // 2
+#             right_len = rawsignal_num - left_len
+#
+#             # left_signals = sum(signals_list[:mid_loc], [])
+#             # right_signals = sum(signals_list[mid_loc:], [])
+#             left_signals = np.concatenate(signals_list[:mid_loc])
+#             right_signals = np.concatenate(signals_list[mid_loc:])
+#
+#             if left_len > len(left_signals):
+#                 right_len = right_len + left_len - len(left_signals)
+#                 left_len = len(left_signals)
+#             elif right_len > len(right_signals):
+#                 left_len = left_len + right_len - len(right_signals)
+#                 right_len = len(right_signals)
+#
+#             assert (right_len + left_len == rawsignal_num)
+#             if left_len == 0:
+#                 cent_signals = right_signals[:right_len]
+#             else:
+#                 cent_signals = np.append(left_signals[-left_len:], right_signals[:right_len])
+#     return cent_signals
 
-    if sum(signal_lens) < rawsignal_num:
-        # real_signals = sum(signals_list, [])
-        real_signals = np.concatenate(signals_list)
-        cent_signals = np.append(real_signals, np.array([0] * (rawsignal_num - len(real_signals))))
-    else:
-        mid_loc = int((len(signals_list) - 1) / 2)
-        mid_base_len = len(signals_list[mid_loc])
 
-        if mid_base_len >= rawsignal_num:
-            allcentsignals = signals_list[mid_loc]
-            cent_signals = [allcentsignals[x] for x in sorted(random.sample(range(len(allcentsignals)),
-                                                                            rawsignal_num))]
-        else:
-            left_len = (rawsignal_num - mid_base_len) // 2
-            right_len = rawsignal_num - left_len
-
-            # left_signals = sum(signals_list[:mid_loc], [])
-            # right_signals = sum(signals_list[mid_loc:], [])
-            left_signals = np.concatenate(signals_list[:mid_loc])
-            right_signals = np.concatenate(signals_list[mid_loc:])
-
-            if left_len > len(left_signals):
-                right_len = right_len + left_len - len(left_signals)
-                left_len = len(left_signals)
-            elif right_len > len(right_signals):
-                left_len = left_len + right_len - len(right_signals)
-                right_len = len(right_signals)
-
-            assert (right_len + left_len == rawsignal_num)
-            if left_len == 0:
-                cent_signals = right_signals[:right_len]
-            else:
-                cent_signals = np.append(left_signals[-left_len:], right_signals[:right_len])
-    return cent_signals
+def _get_signals_rect(signals_list, signals_len=16):
+    signals_rect = []
+    for signals_tmp in signals_list:
+        signals = list(np.around(signals_tmp, decimals=6))
+        if len(signals) < signals_len:
+            pad0_len = signals_len - len(signals)
+            pad0_left = pad0_len // 2
+            pad0_right = pad0_len - pad0_left
+            signals = [0.] * pad0_left + signals + [0.] * pad0_right
+        elif len(signals) > signals_len:
+            signals = [signals[x] for x in sorted(random.sample(range(len(signals)),
+                                                                signals_len))]
+        signals_rect.append(signals)
+    return signals_rect
 
 
 def _get_scaling_of_a_read(fast5fp):
@@ -204,7 +220,7 @@ def _rescale_signals(rawsignals, scaling, offset):
 
 
 def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_method,
-                      motif_seqs, methyloc, chrom2len, kmer_len, raw_signals_len,
+                      motif_seqs, methyloc, chrom2len, kmer_len, signals_len,
                       methy_label, positions):
     features_list = []
     error = 0
@@ -265,11 +281,12 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
                     signal_means = [np.mean(x) for x in k_signals]
                     signal_stds = [np.std(x) for x in k_signals]
 
-                    cent_signals = _get_central_signals(k_signals, raw_signals_len)
+                    # cent_signals = _get_central_signals(k_signals, raw_signals_len)
+                    k_signals_rect = _get_signals_rect(k_signals, signals_len)
 
                     features_list.append((chrom, pos, alignstrand, loc_in_ref, readname, strand,
                                           k_mer, signal_means, signal_stds, signal_lens,
-                                          cent_signals, methy_label))
+                                          k_signals_rect, methy_label))
         except Exception:
             error += 1
             continue
@@ -285,14 +302,14 @@ def _features_to_str(features):
     :return:
     """
     chrom, pos, alignstrand, loc_in_ref, readname, strand, k_mer, signal_means, signal_stds, \
-        signal_lens, cent_signals, methy_label = features
+        signal_lens, k_signals_rect, methy_label = features
     means_text = ','.join([str(x) for x in np.around(signal_means, decimals=6)])
     stds_text = ','.join([str(x) for x in np.around(signal_stds, decimals=6)])
     signal_len_text = ','.join([str(x) for x in signal_lens])
-    cent_signals_text = ','.join([str(x) for x in cent_signals])
+    k_signals_text = ';'.join([",".join([str(y) for y in x]) for x in k_signals_rect])
 
     return "\t".join([chrom, str(pos), alignstrand, str(loc_in_ref), readname, strand, k_mer, means_text,
-                      stds_text, signal_len_text, cent_signals_text, str(methy_label)])
+                      stds_text, signal_len_text, k_signals_text, str(methy_label)])
 
 
 def _fill_files_queue(fast5s_q, fast5_files, batch_size):
@@ -303,7 +320,7 @@ def _fill_files_queue(fast5s_q, fast5_files, batch_size):
 
 def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
                              corrected_group, basecall_subgroup, normalize_method,
-                             motif_seqs, methyloc, chrom2len, kmer_len, raw_signals_len, methy_label,
+                             motif_seqs, methyloc, chrom2len, kmer_len, signals_len, methy_label,
                              positions):
     while not fast5s_q.empty():
         try:
@@ -312,7 +329,7 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
             break
         features_list, error_num = _extract_features(fast5s, corrected_group, basecall_subgroup,
                                                      normalize_method, motif_seqs, methyloc,
-                                                     chrom2len, kmer_len, raw_signals_len, methy_label,
+                                                     chrom2len, kmer_len, signals_len, methy_label,
                                                      positions)
         features_str = []
         for features in features_list:
@@ -413,7 +430,7 @@ def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path,
 def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      batch_size, write_fp, nproc,
                      corrected_group, basecall_subgroup, normalize_method,
-                     motifs, methyloc, kmer_len, raw_signals_len, methy_label,
+                     motifs, methyloc, kmer_len, signals_len, methy_label,
                      position_file, w_is_dir, w_batch_num):
     start = time.time()
 
@@ -433,7 +450,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
         p = mp.Process(target=get_a_batch_features_str, args=(fast5s_q, featurestr_q, errornum_q,
                                                               corrected_group, basecall_subgroup,
                                                               normalize_method, motif_seqs,
-                                                              methyloc, chrom2len, kmer_len, raw_signals_len,
+                                                              methyloc, chrom2len, kmer_len, signals_len,
                                                               methy_label, positions))
         p.daemon = True
         p.start()
@@ -507,11 +524,11 @@ def main():
                                help="the label of the interested modified bases, this is for training."
                                     " 0 or 1, default 1")
     ep_extraction.add_argument("--kmer_len", action="store",
-                               type=int, required=False, default=17,
-                               help="len of kmer. default 17")
-    ep_extraction.add_argument("--cent_signals_len", action="store",
-                               type=int, required=False, default=360,
-                               help="the number of signals to be used in deepsignal, default 360")
+                               type=int, required=False, default=11,
+                               help="len of kmer. default 11")
+    ep_extraction.add_argument("--signals_len", action="store",
+                               type=int, required=False, default=16,
+                               help="the number of signals of one base to be used in deepsignal, default 16")
     ep_extraction.add_argument("--motifs", action="store", type=str,
                                required=False, default='CG',
                                help='motif seq to be extracted, default: CG. '
@@ -567,7 +584,7 @@ def main():
     w_batch_num = extraction_args.w_batch_num
 
     kmer_len = extraction_args.kmer_len
-    cent_signals_num = extraction_args.cent_signals_len
+    signals_len = extraction_args.signals_len
     motifs = extraction_args.motifs
     mod_loc = extraction_args.mod_loc
     methy_label = extraction_args.methy_label
@@ -578,7 +595,7 @@ def main():
 
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      f5_batch_num, write_path, nproc, corrected_group, basecall_subgroup,
-                     normalize_method, motifs, mod_loc, kmer_len, cent_signals_num, methy_label,
+                     normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
                      position_file, w_is_dir, w_batch_num)
 
 
