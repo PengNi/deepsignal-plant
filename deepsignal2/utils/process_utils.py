@@ -6,7 +6,6 @@ import multiprocessing
 import multiprocessing.queues
 import numpy as np
 import gc
-import struct
 import math
 
 basepairs = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N',
@@ -351,27 +350,6 @@ def display_args(args):
         if arg_key != 'func':
             print("{}:\n\t{}".format(arg_key, arg_vars[arg_key]))
     print("# ===============================================")
-
-
-def extract(filename, out_file, format_string):
-    fmt = format_string
-    fread = open(filename, 'r')
-    if out_file is None:
-        fname, fext = os.path.splitext(filename)
-        out_file = fname + ".bin"
-    bin_writer = open(out_file, 'wb')
-    for line in fread:
-        words = line.strip().split("\t")
-        base_char, means, stds, siglen, signals, label = words[6], words[7], words[8], words[9], words[10], words[11]
-        base_int = [base2code_dna[v] for v in base_char]
-        means = [float(v) for v in means.split(',')]
-        stds = [float(v) for v in stds.split(',')]
-        siglen = [int(v) for v in siglen.split(',')]
-        signals = [float(v) for v in signals.split(',')]
-        label = int(label)
-        bin_writer.write(struct.pack(fmt, *base_int + means + stds + siglen + signals + [label]))
-    fread.close()
-    bin_writer.close()
 
 
 # for balancing kmer distri in training samples ===

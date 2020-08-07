@@ -35,10 +35,13 @@ from utils.process_utils import display_args
 from extract_features import _extract_features
 from extract_features import _extract_preprocess
 
+from utils.constants_torch import FloatTensor
 from utils.constants_torch import use_cuda
 
-queen_size_border = 1000
-time_wait = 5
+import uuid
+
+queen_size_border = 2000
+time_wait = 3
 
 
 def _read_features_file(features_file, features_batch_q, batch_num=512):
@@ -86,21 +89,21 @@ def _call_mods(features_batch, model):
         k_signals, labels = features_batch
     labels = np.reshape(labels, (len(labels)))
 
-    testdata = TensorDataset(torch.FloatTensor(kmers), torch.FloatTensor(base_means),
-                             torch.FloatTensor(base_stds), torch.FloatTensor(base_signal_lens),
-                             torch.FloatTensor(k_signals))
+    testdata = TensorDataset(FloatTensor(kmers), FloatTensor(base_means),
+                             FloatTensor(base_stds), FloatTensor(base_signal_lens),
+                             FloatTensor(k_signals))
     testloader = torch.utils.data.DataLoader(testdata, batch_size=labels.shape[0], shuffle=False)
 
     predicted, logits = None, None
     for vi, vsfeatures in enumerate(testloader):
         # only 1 loop
         vkmer, vbase_means, vbase_stds, vbase_signal_lens, vk_signals = vsfeatures
-        if use_cuda:
-            vkmer = vkmer.cuda()
-            vbase_means = vbase_means.cuda()
-            vbase_stds = vbase_stds.cuda()
-            vbase_signal_lens = vbase_signal_lens.cuda()
-            vk_signals = vk_signals.cuda()
+        # if use_cuda:
+        #     vkmer = vkmer.cuda()
+        #     vbase_means = vbase_means.cuda()
+        #     vbase_stds = vbase_stds.cuda()
+        #     vbase_signal_lens = vbase_signal_lens.cuda()
+        #     vk_signals = vk_signals.cuda()
         voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vk_signals)
         _, vpredicted = torch.max(vlogits.data, 1)
         if use_cuda:
@@ -152,6 +155,7 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
             continue
 
         features_batch = features_batch_q.get()
+        # print("process-{} get 1 batch, left in features_batch_q: {}".format(os.getpid(), features_batch_q.qsize()))
         if features_batch == "kill":
             open(success_file, 'w').close()
             break
@@ -240,13 +244,14 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     pred_str_q = Queue()
 
     nproc = args.nproc
+    nproc_gpu = args.nproc_gpu
     if nproc < 2:
         nproc = 2
     elif nproc > 2:
         nproc -= 1
 
     features_batch_procs = []
-    for _ in range(nproc - 1):
+    for _ in range(nproc - nproc_gpu):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
                                                              motif_seqs, chrom2len, positions,
                                                              args))
@@ -254,10 +259,13 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p.start()
         features_batch_procs.append(p)
 
-    p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
-                                                            success_file, args))
-    p_call_mods_gpu.daemon = True
-    p_call_mods_gpu.start()
+    call_mods_gpu_procs = []
+    for _ in range(nproc_gpu):
+        p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
+                                                                success_file, args))
+        p_call_mods_gpu.daemon = True
+        p_call_mods_gpu.start()
+        call_mods_gpu_procs.append(p_call_mods_gpu)
 
     print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
@@ -276,7 +284,8 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p.join()
     features_batch_q.put("kill")
 
-    p_call_mods_gpu.join()
+    for p_call_mods_gpu in call_mods_gpu_procs:
+        p_call_mods_gpu.join()
 
     print("finishing the write_process..")
     pred_str_q.put("kill")
@@ -375,7 +384,7 @@ def call_mods(args):
 
     model_path = os.path.abspath(args.model_path)
     input_path = os.path.abspath(args.input_path)
-    success_file = input_path.rstrip("/") + ".success"
+    success_file = input_path.rstrip("/") + "." + str(uuid.uuid1()) + ".success"
     if os.path.exists(success_file):
         os.remove(success_file)
 
@@ -410,7 +419,7 @@ def call_mods(args):
             nproc -= 2
 
         if use_cuda:
-            nproc_dp = 1
+            nproc_dp = args.nproc_gpu
         else:
             nproc_dp = nproc
 
@@ -471,7 +480,7 @@ def main():
     p_call.add_argument('--layernum2', type=int, default=1,
                         required=False, help="lstm layer num for seq feature (and for signal feature too), default 1")
     p_call.add_argument('--class_num', type=int, default=2, required=False)
-    p_call.add_argument('--dropout_rate', type=float, default=0.5, required=False)
+    p_call.add_argument('--dropout_rate', type=float, default=0, required=False)
     p_call.add_argument('--n_vocab', type=int, default=16, required=False,
                         help="base_seq vocab_size (15 base kinds from iupac)")
     p_call.add_argument('--n_embed', type=int, default=4, required=False,
@@ -530,7 +539,7 @@ def main():
                            'the same')
     p_f5.add_argument("--mod_loc", action="store", type=int, required=False, default=0,
                       help='0-based location of the targeted base in the motif, default 0')
-    p_f5.add_argument("--f5_batch_num", action="store", type=int, default=100,
+    p_f5.add_argument("--f5_batch_num", action="store", type=int, default=20,
                       required=False,
                       help="number of files to be processed by each process one time, default 100")
     p_f5.add_argument("--positions", action="store", type=str,
@@ -540,8 +549,12 @@ def main():
                            "need to be set. --positions is used to narrow down the range of the trageted "
                            "motif locs. default None")
 
-    parser.add_argument("--nproc", "-p", action="store", type=int, default=1,
-                        required=False, help="number of processes to be used, default 1.")
+    parser.add_argument("--nproc", "-p", action="store", type=int, default=10,
+                        required=False, help="number of processes to be used, default 10.")
+    parser.add_argument("--nproc_gpu", action="store", type=int, default=2,
+                        required=False, help="number of processes of gpu to be used, "
+                                             "1 or a number less than (nproc-1), no more than "
+                                             "nproc/2 is suggested. default 2.")
     # parser.add_argument("--is_gpu", action="store", type=str, default="no", required=False,
     #                     choices=["yes", "no"], help="use gpu for tensorflow or not, default no. "
     #                                                 "If you're using a gpu machine, please set to yes. "
