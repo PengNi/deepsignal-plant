@@ -110,34 +110,43 @@ class ModelBiLSTM(nn.Module):
 
         self.hidden_size = hidden_size
 
-        self.nhid_seq = self.hidden_size // 2
-        self.nhid_signal = self.hidden_size - self.nhid_seq
+        if self.module == "both_bilstm":
+            self.nhid_seq = self.hidden_size // 2
+            self.nhid_signal = self.hidden_size - self.nhid_seq
+        elif self.module == "seq_bilstm":
+            self.nhid_seq = self.hidden_size
+        elif self.module == "signal_bilstm":
+            self.nhid_signal = self.hidden_size
+        else:
+            raise ValueError("--model_type is not right!")
 
         # seq feature
-        self.embed = nn.Embedding(vocab_size, embedding_size)  # for dna/rna base
-        self.is_base = is_base
-        self.is_signallen = is_signallen
-        self.sigfea_num = 3 if self.is_signallen else 2
-        if is_base:
-            self.lstm_seq = nn.LSTM(embedding_size + self.sigfea_num, self.nhid_seq, self.num_layers2,
-                                    dropout=dropout_rate, batch_first=True, bidirectional=True)
-        else:
-            self.lstm_seq = nn.LSTM(self.sigfea_num, self.nhid_seq, self.num_layers2,
-                                    dropout=dropout_rate, batch_first=True, bidirectional=True)
-        self.fc_seq = nn.Linear(self.nhid_seq * 2, self.nhid_seq)
-        self.dropout_seq = nn.Dropout(p=dropout_rate)
-        self.relu_seq = nn.ReLU()
+        if self.module != "signal_bilstm":
+            self.embed = nn.Embedding(vocab_size, embedding_size)  # for dna/rna base
+            self.is_base = is_base
+            self.is_signallen = is_signallen
+            self.sigfea_num = 3 if self.is_signallen else 2
+            if is_base:
+                self.lstm_seq = nn.LSTM(embedding_size + self.sigfea_num, self.nhid_seq, self.num_layers2,
+                                        dropout=dropout_rate, batch_first=True, bidirectional=True)
+            else:
+                self.lstm_seq = nn.LSTM(self.sigfea_num, self.nhid_seq, self.num_layers2,
+                                        dropout=dropout_rate, batch_first=True, bidirectional=True)
+            self.fc_seq = nn.Linear(self.nhid_seq * 2, self.nhid_seq)
+            # self.dropout_seq = nn.Dropout(p=dropout_rate)
+            self.relu_seq = nn.ReLU()
 
         # signal feature
-        # self.convs = ResNet3(self.nhid_signal, (1, 1, 1), self.signal_len, self.signal_len)  # (N, C, L)
-        self.lstm_signal = nn.LSTM(self.signal_len, self.nhid_signal, self.num_layers2,
-                                   dropout=dropout_rate, batch_first=True, bidirectional=True)
-        self.fc_signal = nn.Linear(self.nhid_signal * 2, self.nhid_signal)
-        self.dropout_signal = nn.Dropout(p=dropout_rate)
-        self.relu_signal = nn.ReLU()
+        if self.module != "seq_bilstm":
+            # self.convs = ResNet3(self.nhid_signal, (1, 1, 1), self.signal_len, self.signal_len)  # (N, C, L)
+            self.lstm_signal = nn.LSTM(self.signal_len, self.nhid_signal, self.num_layers2,
+                                       dropout=dropout_rate, batch_first=True, bidirectional=True)
+            self.fc_signal = nn.Linear(self.nhid_signal * 2, self.nhid_signal)
+            # self.dropout_signal = nn.Dropout(p=dropout_rate)
+            self.relu_signal = nn.ReLU()
 
         # combined
-        self.lstm_comb = nn.LSTM(self.nhid_seq + self.nhid_signal, self.hidden_size, self.num_layers1,
+        self.lstm_comb = nn.LSTM(self.hidden_size, self.hidden_size, self.num_layers1,
                                  dropout=dropout_rate, batch_first=True, bidirectional=True)
         self.dropout1 = nn.Dropout(p=dropout_rate)
         self.fc1 = nn.Linear(hidden_size * 2, hidden_size)  # 2 for bidirection
@@ -161,43 +170,50 @@ class ModelBiLSTM(nn.Module):
 
     def forward(self, kmer, base_means, base_stds, base_signal_lens, signals):
         # seq feature ============================================
-        base_means = torch.reshape(base_means, (-1, self.seq_len, 1)).float()
-        base_stds = torch.reshape(base_stds, (-1, self.seq_len, 1)).float()
-        base_signal_lens = torch.reshape(base_signal_lens, (-1, self.seq_len, 1)).float()
-        if self.is_base:
-            kmer_embed = self.embed(kmer.long())
-            if self.is_signallen:
-                out_seq = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+        if self.module != "signal_bilstm":
+            base_means = torch.reshape(base_means, (-1, self.seq_len, 1)).float()
+            base_stds = torch.reshape(base_stds, (-1, self.seq_len, 1)).float()
+            base_signal_lens = torch.reshape(base_signal_lens, (-1, self.seq_len, 1)).float()
+            if self.is_base:
+                kmer_embed = self.embed(kmer.long())
+                if self.is_signallen:
+                    out_seq = torch.cat((kmer_embed, base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+                else:
+                    out_seq = torch.cat((kmer_embed, base_means, base_stds), 2)  # (N, L, C)
             else:
-                out_seq = torch.cat((kmer_embed, base_means, base_stds), 2)  # (N, L, C)
-        else:
-            if self.is_signallen:
-                out_seq = torch.cat((base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
-            else:
-                out_seq = torch.cat((base_means, base_stds), 2)  # (N, L, C)
-        out_seq, _ = self.lstm_seq(out_seq, self.init_hidden(out_seq.size(0),
-                                                             self.num_layers2,
-                                                             self.nhid_seq))  # (N, L, nhid_seq*2)
-        out_seq = self.fc_seq(out_seq)  # (N, L, nhid_seq)
-        out_seq = self.dropout_seq(out_seq)
-        out_seq = self.relu_seq(out_seq)
+                if self.is_signallen:
+                    out_seq = torch.cat((base_means, base_stds, base_signal_lens), 2)  # (N, L, C)
+                else:
+                    out_seq = torch.cat((base_means, base_stds), 2)  # (N, L, C)
+            out_seq, _ = self.lstm_seq(out_seq, self.init_hidden(out_seq.size(0),
+                                                                 self.num_layers2,
+                                                                 self.nhid_seq))  # (N, L, nhid_seq*2)
+            out_seq = self.fc_seq(out_seq)  # (N, L, nhid_seq)
+            # out_seq = self.dropout_seq(out_seq)
+            out_seq = self.relu_seq(out_seq)
 
         # signal feature ==========================================
-        out_signal = signals.float()
-        # resnet ---
-        # out_signal = out_signal.transpose(1, 2)  # (N, C, L)
-        # out_signal = self.convs(out_signal)  # (N, nhid_signal, L)
-        # out_signal = out_signal.transpose(1, 2)  # (N, L, nhid_signal)
-        # lstm ---
-        out_signal, _ = self.lstm_signal(out_signal, self.init_hidden(out_signal.size(0),
-                                                                      self.num_layers2,
-                                                                      self.nhid_signal))
-        out_signal = self.fc_signal(out_signal)  # (N, L, nhid_signal)
-        out_signal = self.dropout_signal(out_signal)
-        out_signal = self.relu_signal(out_signal)
+        if self.module != "seq_bilstm":
+            out_signal = signals.float()
+            # resnet ---
+            # out_signal = out_signal.transpose(1, 2)  # (N, C, L)
+            # out_signal = self.convs(out_signal)  # (N, nhid_signal, L)
+            # out_signal = out_signal.transpose(1, 2)  # (N, L, nhid_signal)
+            # lstm ---
+            out_signal, _ = self.lstm_signal(out_signal, self.init_hidden(out_signal.size(0),
+                                                                          self.num_layers2,
+                                                                          self.nhid_signal))
+            out_signal = self.fc_signal(out_signal)  # (N, L, nhid_signal)
+            # out_signal = self.dropout_signal(out_signal)
+            out_signal = self.relu_signal(out_signal)
 
         # combined ================================================
-        out = torch.cat((out_seq, out_signal), 2)  # (N, L, hidden_size)
+        if self.module == "seq_bilstm":
+            out = out_seq
+        elif self.module == "signal_bilstm":
+            out = out_signal
+        elif self.module == "both_bilstm":
+            out = torch.cat((out_seq, out_signal), 2)  # (N, L, hidden_size)
         out, _ = self.lstm_comb(out, self.init_hidden(out.size(0),
                                                       self.num_layers1,
                                                       self.hidden_size))  # (N, L, hidden_size*2)
