@@ -322,11 +322,15 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
                              corrected_group, basecall_subgroup, normalize_method,
                              motif_seqs, methyloc, chrom2len, kmer_len, signals_len, methy_label,
                              positions):
-    while not fast5s_q.empty():
-        try:
-            fast5s = fast5s_q.get()
-        except Exception:
+    f5_num = 0
+    while True:
+        if fast5s_q.empty():
+            time.sleep(time_wait)
+        fast5s = fast5s_q.get()
+        if fast5s == "kill":
+            fast5s_q.put("kill")
             break
+        f5_num += len(fast5s)
         features_list, error_num = _extract_features(fast5s, corrected_group, basecall_subgroup,
                                                      normalize_method, motif_seqs, methyloc,
                                                      chrom2len, kmer_len, signals_len, methy_label,
@@ -339,7 +343,7 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
         featurestr_q.put(features_str)
         while featurestr_q.qsize() > queen_size_border:
             time.sleep(time_wait)
-    # print("get out of while loop in get_feature_str")
+    print("extrac_features process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
 def _write_featurestr_to_file(write_fp, featurestr_q):
@@ -351,6 +355,7 @@ def _write_featurestr_to_file(write_fp, featurestr_q):
                 continue
             features_str = featurestr_q.get()
             if features_str == "kill":
+                print('write_process-{} finished'.format(os.getpid()))
                 break
             for one_features_str in features_str:
                 wf.write(one_features_str + "\n")
@@ -374,6 +379,7 @@ def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num):
             continue
         features_str = featurestr_q.get()
         if features_str == "kill":
+            print('write_process-{} finished'.format(os.getpid()))
             break
 
         if batch_count >= w_batch_num:
@@ -432,6 +438,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      corrected_group, basecall_subgroup, normalize_method,
                      motifs, methyloc, kmer_len, signals_len, methy_label,
                      position_file, w_is_dir, w_batch_num):
+    print("[main]extract_features starts..")
     start = time.time()
 
     motif_seqs, chrom2len, fast5s_q, len_fast5s, positions = _extract_preprocess(fast5_dir, is_recursive,
@@ -446,6 +453,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
     featurestr_procs = []
     if nproc > 1:
         nproc -= 1
+    fast5s_q.put("kill")
     for _ in range(nproc):
         p = mp.Process(target=get_a_batch_features_str, args=(fast5s_q, featurestr_q, errornum_q,
                                                               corrected_group, basecall_subgroup,
@@ -456,7 +464,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
         p.start()
         featurestr_procs.append(p)
 
-    print("write_process started..")
+    # print("write_process started..")
     p_w = mp.Process(target=_write_featurestr, args=(write_fp, featurestr_q, w_batch_num, w_is_dir))
     p_w.daemon = True
     p_w.start()
@@ -473,14 +481,14 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
     for p in featurestr_procs:
         p.join()
 
-    print("finishing the write_process..")
+    # print("finishing the write_process..")
     featurestr_q.put("kill")
 
     p_w.join()
 
     print("%d of %d fast5 files failed..\n"
-          "extract_features costs %.1f seconds.." % (errornum_sum, len_fast5s,
-                                                     time.time() - start))
+          "[main]extract_features costs %.1f seconds.." % (errornum_sum, len_fast5s,
+                                                           time.time() - start))
 
 
 def main():
@@ -523,10 +531,10 @@ def main():
                                choices=[1, 0], required=False, default=1,
                                help="the label of the interested modified bases, this is for training."
                                     " 0 or 1, default 1")
-    ep_extraction.add_argument("--kmer_len", action="store",
+    ep_extraction.add_argument("--seq_len", action="store",
                                type=int, required=False, default=11,
                                help="len of kmer. default 11")
-    ep_extraction.add_argument("--signals_len", action="store",
+    ep_extraction.add_argument("--signal_len", action="store",
                                type=int, required=False, default=16,
                                help="the number of signals of one base to be used in deepsignal, default 16")
     ep_extraction.add_argument("--motifs", action="store", type=str,
@@ -564,7 +572,7 @@ def main():
     extraction_parser.add_argument("--nproc", "-p", action="store", type=int, default=1,
                                    required=False,
                                    help="number of processes to be used, default 1")
-    extraction_parser.add_argument("--f5_batch_num", action="store", type=int, default=100,
+    extraction_parser.add_argument("--f5_batch_size", action="store", type=int, default=100,
                                    required=False,
                                    help="number of files to be processed by each process one time, default 100")
 
@@ -583,18 +591,18 @@ def main():
     w_is_dir = str2bool(extraction_args.w_is_dir)
     w_batch_num = extraction_args.w_batch_num
 
-    kmer_len = extraction_args.kmer_len
-    signals_len = extraction_args.signals_len
+    kmer_len = extraction_args.seq_len
+    signals_len = extraction_args.signal_len
     motifs = extraction_args.motifs
     mod_loc = extraction_args.mod_loc
     methy_label = extraction_args.methy_label
     position_file = extraction_args.positions
 
     nproc = extraction_args.nproc
-    f5_batch_num = extraction_args.f5_batch_num
+    f5_batch_size = extraction_args.f5_batch_size
 
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
-                     f5_batch_num, write_path, nproc, corrected_group, basecall_subgroup,
+                     f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
                      normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
                      position_file, w_is_dir, w_batch_num)
 

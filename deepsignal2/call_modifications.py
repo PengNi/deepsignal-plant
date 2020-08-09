@@ -8,7 +8,6 @@ prob_0, prob_1, called_label, seq
 from __future__ import absolute_import
 
 import torch
-from torch.utils.data import TensorDataset
 import argparse
 import os
 import sys
@@ -40,11 +39,12 @@ from utils.constants_torch import use_cuda
 
 import uuid
 
-queen_size_border = 2000
+queen_size_border = 1000
 time_wait = 3
 
 
 def _read_features_file(features_file, features_batch_q, batch_num=512):
+    b_num = 0
     with open(features_file, "r") as rf:
         sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
         kmers = []
@@ -63,7 +63,7 @@ def _read_features_file(features_file, features_batch_q, batch_num=512):
             base_means.append([float(x) for x in words[7].split(",")])
             base_stds.append([float(x) for x in words[8].split(",")])
             base_signal_lens.append([int(x) for x in words[9].split(",")])
-            k_signals = np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")])
+            k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
             labels.append(int(words[11]))
 
             if len(sampleinfo) == batch_num:
@@ -78,55 +78,60 @@ def _read_features_file(features_file, features_batch_q, batch_num=512):
                 base_signal_lens = []
                 k_signals = []
                 labels = []
+                b_num += 1
         if len(sampleinfo) > 0:
             features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
                                   base_signal_lens, k_signals, labels))
     features_batch_q.put("kill")
+    print("read_features process-{} ending, read {} batches".format(os.getpid(), b_num))
 
 
-def _call_mods(features_batch, model):
+def _call_mods(features_batch, model, batch_size):
+    # features_batch: 1. if from _read_features_file(), has 1 * args.batch_size samples
+    # --------------: 2. if from _read_features_from_fast5s(), has uncertain number of samples
     sampleinfo, kmers, base_means, base_stds, base_signal_lens, \
         k_signals, labels = features_batch
     labels = np.reshape(labels, (len(labels)))
 
-    testdata = TensorDataset(FloatTensor(kmers), FloatTensor(base_means),
-                             FloatTensor(base_stds), FloatTensor(base_signal_lens),
-                             FloatTensor(k_signals))
-    testloader = torch.utils.data.DataLoader(testdata, batch_size=labels.shape[0], shuffle=False)
-
-    predicted, logits = None, None
-    for vi, vsfeatures in enumerate(testloader):
-        # only 1 loop
-        vkmer, vbase_means, vbase_stds, vbase_signal_lens, vk_signals = vsfeatures
-        # if use_cuda:
-        #     vkmer = vkmer.cuda()
-        #     vbase_means = vbase_means.cuda()
-        #     vbase_stds = vbase_stds.cuda()
-        #     vbase_signal_lens = vbase_signal_lens.cuda()
-        #     vk_signals = vk_signals.cuda()
-        voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vk_signals)
-        _, vpredicted = torch.max(vlogits.data, 1)
-        if use_cuda:
-            vlogits = vlogits.cpu()
-            vpredicted = vpredicted.cpu()
-
-        predicted = vpredicted.numpy()
-        logits = vlogits.data.numpy()
-
-    accuracy = metrics.accuracy_score(
-        y_true=labels, y_pred=predicted)
-
     pred_str = []
-    for idx in range(labels.shape[0]):
-        # chromosome, pos, strand, pos_in_strand, read_name, read_strand, prob_0, prob_1, called_label, seq
-        prob_0, prob_1 = logits[idx][0], logits[idx][1]
-        prob_0_norm = prob_0 / (prob_0 + prob_1)
-        prob_1_norm = prob_1 / (prob_0 + prob_1)
-        pred_str.append("\t".join([sampleinfo[idx], str(prob_0_norm),
-                                   str(prob_1_norm), str(predicted[idx]),
-                                   ''.join([code2base_dna[x] for x in kmers[idx]])]))
+    accuracys = []
+    batch_num = 0
+    for i in np.arange(0, len(sampleinfo), batch_size):
+        batch_s, batch_e = i, i + batch_size
+        b_sampleinfo = sampleinfo[batch_s:batch_e]
+        b_kmers = kmers[batch_s:batch_e]
+        b_base_means = base_means[batch_s:batch_e]
+        b_base_stds = base_stds[batch_s:batch_e]
+        b_base_signal_lens = base_signal_lens[batch_s:batch_e]
+        b_k_signals = k_signals[batch_s:batch_e]
+        b_labels = labels[batch_s:batch_e]
+        if len(b_sampleinfo) > 0:
+            voutputs, vlogits = model(FloatTensor(b_kmers), FloatTensor(b_base_means), FloatTensor(b_base_stds),
+                                      FloatTensor(b_base_signal_lens), FloatTensor(b_k_signals))
+            _, vpredicted = torch.max(vlogits.data, 1)
+            if use_cuda:
+                vlogits = vlogits.cpu()
+                vpredicted = vpredicted.cpu()
 
-    return pred_str, accuracy
+            predicted = vpredicted.numpy()
+            logits = vlogits.data.numpy()
+
+            acc_batch = metrics.accuracy_score(
+                y_true=b_labels, y_pred=predicted)
+            accuracys.append(acc_batch)
+
+            for idx in range(len(b_sampleinfo)):
+                # chromosome, pos, strand, pos_in_strand, read_name, read_strand, prob_0, prob_1, called_label, seq
+                prob_0, prob_1 = logits[idx][0], logits[idx][1]
+                prob_0_norm = prob_0 / (prob_0 + prob_1)
+                prob_1_norm = prob_1 / (prob_0 + prob_1)
+                pred_str.append("\t".join([b_sampleinfo[idx], str(prob_0_norm),
+                                           str(prob_1_norm), str(predicted[idx]),
+                                           ''.join([code2base_dna[x] for x in b_kmers[idx]])]))
+            batch_num += 1
+    accuracy = np.mean(accuracys)
+
+    return pred_str, accuracy, batch_num
 
 
 def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
@@ -136,8 +141,10 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
                         args.model_type)
     if use_cuda:
         model = model.cuda()
+        para_dict = torch.load(model_path)
+    else:
+        para_dict = torch.load(model_path, map_location=torch.device('cpu'))
 
-    para_dict = torch.load(model_path)
     model_dict = model.state_dict()
     model_dict.update(para_dict)
     model.load_state_dict(model_dict)
@@ -145,28 +152,29 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
     model.eval()
 
     accuracy_list = []
-    count = 0
+    batch_num_total = 0
     while True:
-        if os.path.exists(success_file):
-            break
+        # if os.path.exists(success_file):
+        #     break
 
         if features_batch_q.empty():
             time.sleep(time_wait)
             continue
 
         features_batch = features_batch_q.get()
-        # print("process-{} get 1 batch, left in features_batch_q: {}".format(os.getpid(), features_batch_q.qsize()))
         if features_batch == "kill":
-            open(success_file, 'w').close()
+            # deprecate successfile, use "kill" signal multi times to kill each process
+            features_batch_q.put("kill")
+            # open(success_file, 'w').close()
             break
 
-        pred_str, accuracy = _call_mods(features_batch, model)
+        pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
 
         pred_str_q.put(pred_str)
         accuracy_list.append(accuracy)
-        count += 1
+        batch_num_total += batch_num
     # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
-    print('call_mods process {} ending, proceed {} batches'.format(os.getpid(), count))
+    print('call_mods process-{} ending, proceed {} batches'.format(os.getpid(), batch_num_total))
 
 
 def _write_predstr_to_file(write_fp, predstr_q):
@@ -178,6 +186,7 @@ def _write_predstr_to_file(write_fp, predstr_q):
                 continue
             pred_str = predstr_q.get()
             if pred_str == "kill":
+                print('write_process-{} finished'.format(os.getpid()))
                 break
             for one_pred_str in pred_str:
                 wf.write(one_pred_str + "\n")
@@ -190,39 +199,64 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, args):
                                              args.seq_len, args.signal_len,
                                              args.methy_label, positions)
     features_batches = []
-    for i in np.arange(0, len(features_list), args.batch_size):
-        sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
-        kmers = []
-        base_means = []
-        base_stds = []
-        base_signal_lens = []
-        k_signals = []
-        labels = []
+    # for i in np.arange(0, len(features_list), args.batch_size):
+    #     sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
+    #     kmers = []
+    #     base_means = []
+    #     base_stds = []
+    #     base_signal_lens = []
+    #     k_signals = []
+    #     labels = []
+    #
+    #     for features in features_list[i:(i + args.batch_size)]:
+    #         chrom, pos, alignstrand, loc_in_ref, readname, strand, k_mer, signal_means, signal_stds, \
+    #             signal_lens, kmer_base_signals, f_methy_label = features
+    #
+    #         sampleinfo.append("\t".join([chrom, str(pos), alignstrand, str(loc_in_ref), readname, strand]))
+    #         kmers.append([base2code_dna[x] for x in k_mer])
+    #         base_means.append(signal_means)
+    #         base_stds.append(signal_stds)
+    #         base_signal_lens.append(signal_lens)
+    #         k_signals.append(kmer_base_signals)
+    #         labels.append(f_methy_label)
+    #     if len(sampleinfo) > 0:
+    #         features_batches.append((sampleinfo, kmers, base_means, base_stds,
+    #                                  base_signal_lens, k_signals, labels))
 
-        for features in features_list[i:(i + args.batch_size)]:
-            chrom, pos, alignstrand, loc_in_ref, readname, strand, k_mer, signal_means, signal_stds, \
-                signal_lens, kmer_base_signals, f_methy_label = features
+    sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
+    kmers = []
+    base_means = []
+    base_stds = []
+    base_signal_lens = []
+    k_signals = []
+    labels = []
+    for features in features_list:
+        chrom, pos, alignstrand, loc_in_ref, readname, strand, k_mer, signal_means, signal_stds, \
+                    signal_lens, kmer_base_signals, f_methy_label = features
 
-            sampleinfo.append("\t".join([chrom, str(pos), alignstrand, str(loc_in_ref), readname, strand]))
-            kmers.append([base2code_dna[x] for x in k_mer])
-            base_means.append(signal_means)
-            base_stds.append(signal_stds)
-            base_signal_lens.append(signal_lens)
-            k_signals.append(kmer_base_signals)
-            labels.append(f_methy_label)
-        if len(sampleinfo) > 0:
-            features_batches.append((sampleinfo, kmers, base_means, base_stds,
-                                     base_signal_lens, k_signals, labels))
+        sampleinfo.append("\t".join([chrom, str(pos), alignstrand, str(loc_in_ref), readname, strand]))
+        kmers.append([base2code_dna[x] for x in k_mer])
+        base_means.append(signal_means)
+        base_stds.append(signal_stds)
+        base_signal_lens.append(signal_lens)
+        k_signals.append(kmer_base_signals)
+        labels.append(f_methy_label)
+    features_batches.append((sampleinfo, kmers, base_means, base_stds,
+                             base_signal_lens, k_signals, labels))
     return features_batches, error
 
 
 def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
                             motif_seqs, chrom2len, positions, args):
-    while not fast5s_q.empty():
-        try:
-            fast5s = fast5s_q.get()
-        except Exception:
+    f5_num = 0
+    while True:
+        if fast5s_q.empty():
+            time.sleep(time_wait)
+        fast5s = fast5s_q.get()
+        if fast5s == "kill":
+            fast5s_q.put("kill")
             break
+        f5_num += len(fast5s)
         features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
                                                              args)
         errornum_q.put(error)
@@ -230,6 +264,7 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
             features_batch_q.put(features_batch)
         while features_batch_q.qsize() > queen_size_border:
             time.sleep(time_wait)
+    print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
 def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions,
@@ -250,6 +285,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     elif nproc > 2:
         nproc -= 1
 
+    fast5s_q.put("kill")
     features_batch_procs = []
     for _ in range(nproc - nproc_gpu):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
@@ -267,7 +303,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p_call_mods_gpu.start()
         call_mods_gpu_procs.append(p_call_mods_gpu)
 
-    print("write_process started..")
+    # print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
     p_w.daemon = True
     p_w.start()
@@ -287,7 +323,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     for p_call_mods_gpu in call_mods_gpu_procs:
         p_call_mods_gpu.join()
 
-    print("finishing the write_process..")
+    # print("finishing the write_process..")
     pred_str_q.put("kill")
 
     p_w.join()
@@ -305,7 +341,7 @@ def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
     # if use_cuda:
     #     model = model.cuda()
 
-    para_dict = torch.load(model_path)
+    para_dict = torch.load(model_path, map_location=torch.device('cpu'))
     model_dict = model.state_dict()
     model_dict.update(para_dict)
     model.load_state_dict(model_dict)
@@ -313,24 +349,28 @@ def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
     model.eval()
 
     accuracy_list = []
-    count = 0
-
-    while not fast5s_q.empty():
-        try:
-            fast5s = fast5s_q.get()
-        except Exception:
+    batch_num_total = 0
+    f5_num = 0
+    fast5s_q.put("kill")
+    while True:
+        if fast5s_q.empty():
+            time.sleep(time_wait)
+        fast5s = fast5s_q.get()
+        if fast5s == "kill":
+            fast5s_q.put("kill")
             break
+        f5_num += len(fast5s)
         features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
                                                              args)
         errornum_q.put(error)
         for features_batch in features_batches:
-            pred_str, accuracy = _call_mods(features_batch, model)
+            pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
 
             pred_str_q.put(pred_str)
             accuracy_list.append(accuracy)
-            count += 1
+            batch_num_total += batch_num
     # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
-    print('call_mods process {} ending, proceed {} batches'.format(os.getpid(), count))
+    print('call_mods process-{} ending, proceed {} fast5s ({} batches)'.format(os.getpid(), f5_num, batch_num_total))
 
 
 def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
@@ -355,7 +395,7 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p.start()
         pred_str_procs.append(p)
 
-    print("write_process started..")
+    # print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
     p_w.daemon = True
     p_w.start()
@@ -371,7 +411,7 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     for p in pred_str_procs:
         p.join()
 
-    print("finishing the write_process..")
+    # print("finishing the write_process..")
     pred_str_q.put("kill")
 
     p_w.join()
@@ -380,6 +420,7 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
 
 def call_mods(args):
+    print("[main]call_mods starts..")
     start = time.time()
 
     model_path = os.path.abspath(args.model_path)
@@ -394,7 +435,7 @@ def call_mods(args):
                                                                                      args.motifs,
                                                                                      str2bool(args.is_dna),
                                                                                      args.reference_path,
-                                                                                     args.f5_batch_num,
+                                                                                     args.f5_batch_size,
                                                                                      args.positions)
         if use_cuda:
             _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
@@ -430,7 +471,7 @@ def call_mods(args):
             p.start()
             predstr_procs.append(p)
 
-        print("write_process started..")
+        # print("write_process started..")
         p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
         p_w.daemon = True
         p_w.start()
@@ -438,7 +479,7 @@ def call_mods(args):
         for p in predstr_procs:
             p.join()
 
-        print("finishing the write_process..")
+        # print("finishing the write_process..")
         pred_str_q.put("kill")
 
         p_rf.join()
@@ -447,7 +488,7 @@ def call_mods(args):
 
     if os.path.exists(success_file):
         os.remove(success_file)
-    print("call_mods costs %.2f seconds.." % (time.time() - start))
+    print("[main]call_mods costs %.2f seconds.." % (time.time() - start))
 
 
 def main():
@@ -539,9 +580,9 @@ def main():
                            'the same')
     p_f5.add_argument("--mod_loc", action="store", type=int, required=False, default=0,
                       help='0-based location of the targeted base in the motif, default 0')
-    p_f5.add_argument("--f5_batch_num", action="store", type=int, default=20,
+    p_f5.add_argument("--f5_batch_size", action="store", type=int, default=20,
                       required=False,
-                      help="number of files to be processed by each process one time, default 100")
+                      help="number of files to be processed by each process one time, default 20")
     p_f5.add_argument("--positions", action="store", type=str,
                       required=False, default=None,
                       help="file with a list of positions interested (must be formatted as tab-separated file"
@@ -552,9 +593,9 @@ def main():
     parser.add_argument("--nproc", "-p", action="store", type=int, default=10,
                         required=False, help="number of processes to be used, default 10.")
     parser.add_argument("--nproc_gpu", action="store", type=int, default=2,
-                        required=False, help="number of processes of gpu to be used, "
+                        required=False, help="number of processes to use gpu (if gpu is available), "
                                              "1 or a number less than (nproc-1), no more than "
-                                             "nproc/2 is suggested. default 2.")
+                                             "nproc/4 is suggested. default 2.")
     # parser.add_argument("--is_gpu", action="store", type=str, default="no", required=False,
     #                     choices=["yes", "no"], help="use gpu for tensorflow or not, default no. "
     #                                                 "If you're using a gpu machine, please set to yes. "
