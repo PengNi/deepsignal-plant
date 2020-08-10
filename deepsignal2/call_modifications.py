@@ -578,10 +578,10 @@ def main():
 
     parser.add_argument("--nproc", "-p", action="store", type=int, default=10,
                         required=False, help="number of processes to be used, default 10.")
-    parser.add_argument("--nproc_gpu", action="store", type=int, default=1,
+    parser.add_argument("--nproc_gpu", action="store", type=int, default=2,
                         required=False, help="number of processes to use gpu (if gpu is available), "
                                              "1 or a number less than nproc-1, no more than "
-                                             "nproc/4 is suggested. default 1.")
+                                             "nproc/4 is suggested. default 2.")
     # parser.add_argument("--is_gpu", action="store", type=str, default="no", required=False,
     #                     choices=["yes", "no"], help="use gpu for tensorflow or not, default no. "
     #                                                 "If you're using a gpu machine, please set to yes. "
