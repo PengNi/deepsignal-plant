@@ -39,11 +39,13 @@ from utils.constants_torch import use_cuda
 
 import uuid
 
-queen_size_border = 1000
+queen_size_border = 2000
+queen_size_border_f5batch = 50
 time_wait = 3
 
 
 def _read_features_file(features_file, features_batch_q, batch_num=512):
+    print("read_features process-{} starts".format(os.getpid()))
     b_num = 0
     with open(features_file, "r") as rf:
         sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
@@ -135,6 +137,7 @@ def _call_mods(features_batch, model, batch_size):
 
 
 def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
+    print('call_mods process-{} starts'.format(os.getpid()))
     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
                         args.dropout_rate, args.hid_rnn,
                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
@@ -171,6 +174,9 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
         pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
 
         pred_str_q.put(pred_str)
+        # for debug
+        # print("call_mods process-{} reads 1 batch, features_batch_q:{}, "
+        #       "pred_str_q: {}".format(os.getpid(), features_batch_q.qsize(), pred_str_q.qsize()))
         accuracy_list.append(accuracy)
         batch_num_total += batch_num
     # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
@@ -178,6 +184,7 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
 
 
 def _write_predstr_to_file(write_fp, predstr_q):
+    print('write_process-{} starts'.format(os.getpid()))
     with open(write_fp, 'w') as wf:
         while True:
             # during test, it's ok without the sleep()
@@ -199,29 +206,6 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, args):
                                              args.seq_len, args.signal_len,
                                              args.methy_label, positions)
     features_batches = []
-    # for i in np.arange(0, len(features_list), args.batch_size):
-    #     sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
-    #     kmers = []
-    #     base_means = []
-    #     base_stds = []
-    #     base_signal_lens = []
-    #     k_signals = []
-    #     labels = []
-    #
-    #     for features in features_list[i:(i + args.batch_size)]:
-    #         chrom, pos, alignstrand, loc_in_ref, readname, strand, k_mer, signal_means, signal_stds, \
-    #             signal_lens, kmer_base_signals, f_methy_label = features
-    #
-    #         sampleinfo.append("\t".join([chrom, str(pos), alignstrand, str(loc_in_ref), readname, strand]))
-    #         kmers.append([base2code_dna[x] for x in k_mer])
-    #         base_means.append(signal_means)
-    #         base_stds.append(signal_stds)
-    #         base_signal_lens.append(signal_lens)
-    #         k_signals.append(kmer_base_signals)
-    #         labels.append(f_methy_label)
-    #     if len(sampleinfo) > 0:
-    #         features_batches.append((sampleinfo, kmers, base_means, base_stds,
-    #                                  base_signal_lens, k_signals, labels))
 
     sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
     kmers = []
@@ -248,6 +232,7 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, args):
 
 def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
                             motif_seqs, chrom2len, positions, args):
+    print("read_fast5 process-{} starts".format(os.getpid()))
     f5_num = 0
     while True:
         if fast5s_q.empty():
@@ -262,7 +247,7 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
         errornum_q.put(error)
         for features_batch in features_batches:
             features_batch_q.put(features_batch)
-        while features_batch_q.qsize() > queen_size_border:
+        while features_batch_q.qsize() > queen_size_border_f5batch:
             time.sleep(time_wait)
     print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
@@ -333,6 +318,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
 def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
                             motif_seqs, chrom2len, model_path, positions, args):
+    print('call_mods process-{} starts'.format(os.getpid()))
     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
                         args.dropout_rate, args.hid_rnn,
                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
@@ -592,10 +578,10 @@ def main():
 
     parser.add_argument("--nproc", "-p", action="store", type=int, default=10,
                         required=False, help="number of processes to be used, default 10.")
-    parser.add_argument("--nproc_gpu", action="store", type=int, default=2,
+    parser.add_argument("--nproc_gpu", action="store", type=int, default=1,
                         required=False, help="number of processes to use gpu (if gpu is available), "
-                                             "1 or a number less than (nproc-1), no more than "
-                                             "nproc/4 is suggested. default 2.")
+                                             "1 or a number less than nproc-1, no more than "
+                                             "nproc/4 is suggested. default 1.")
     # parser.add_argument("--is_gpu", action="store", type=str, default="no", required=False,
     #                     choices=["yes", "no"], help="use gpu for tensorflow or not, default no. "
     #                                                 "If you're using a gpu machine, please set to yes. "
