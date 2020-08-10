@@ -457,6 +457,16 @@ def select_negsamples_asposkmer(pos_file, totalneg_file, seled_neg_file):
     _write_randsel_lines(totalneg_file, seled_neg_file, sel_lines)
 
 
+# get model type main params
+def get_model_type_str(model_type, is_base, is_signallen):
+    if model_type != "signal_bilstm":
+        basestr = "with_base" if is_base else "no_base"
+        slenstr = "with_slen" if is_signallen else "no_slen"
+        return "_".join([model_type, basestr, slenstr])
+    else:
+        return "_".join([model_type])
+
+
 class SharedCounter(object):
     """ A synchronized shared counter.
     The locking done by multiprocessing.Value ensures that only a single

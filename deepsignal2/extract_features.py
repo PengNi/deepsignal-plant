@@ -19,6 +19,7 @@ from multiprocessing import Queue
 from statsmodels import robust
 
 from utils.process_utils import str2bool
+from utils.process_utils import display_args
 from utils.process_utils import get_fast5s
 from utils.process_utils import get_refloc_of_methysite_in_motif
 from utils.process_utils import get_motif_seqs
@@ -577,6 +578,7 @@ def main():
                                    help="number of files to be processed by each process one time, default 100")
 
     extraction_args = extraction_parser.parse_args()
+    display_args(extraction_args)
 
     fast5_dir = extraction_args.fast5_dir
     is_recursive = str2bool(extraction_args.recursively)

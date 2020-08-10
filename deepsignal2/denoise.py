@@ -22,6 +22,7 @@ from utils.process_utils import count_line_num
 from utils.process_utils import concat_two_files
 
 from utils.process_utils import select_negsamples_asposkmer
+from utils.process_utils import get_model_type_str
 
 
 def train_1time(train_file, valid_file, valid_lidxs, args):
@@ -161,7 +162,7 @@ def train_1time(train_file, valid_file, valid_lidxs, args):
     return idx2aclogits
 
 
-def train_rounds(train_file, iterstr, args):
+def train_rounds(train_file, iterstr, args, modeltype_str):
     print("\n##########Train Cross Rank##########")
     total_num = count_line_num(train_file, False)
     half_num = total_num // 2
@@ -172,8 +173,12 @@ def train_rounds(train_file, iterstr, args):
 
     for i in range(0, args.rounds):
         print("##########Train Cross Rank, Iter {}, Round {}##########".format(iterstr, i+1))
-        train_file1 = fname + ".half1" + fext
-        train_file2 = fname + ".half2" + fext
+        if train_file == args.train_file:
+            train_file1 = fname + "." + modeltype_str + ".half1" + fext
+            train_file2 = fname + "." + modeltype_str + ".half2" + fext
+        else:
+            train_file1 = fname + ".half1" + fext
+            train_file2 = fname + ".half2" + fext
         lidxs1, lidxs2 = random_select_file_rows_s(train_file, train_file1, train_file2,
                                                    half_num, False)
         print("##########Train Cross Rank, Iter {}, Round {}, part1##########".format(iterstr, i + 1))
@@ -192,7 +197,7 @@ def train_rounds(train_file, iterstr, args):
     return idxs2logtis_all
 
 
-def clean_samples(train_file, idx2logits, score_cf, is_filter_fn):
+def clean_samples(train_file, idx2logits, score_cf, is_filter_fn, ori_train_file, modeltype_str):
     # clean train samples ===
     print("\n###### clean the samples ######")
     idx2probs = dict()
@@ -239,10 +244,16 @@ def clean_samples(train_file, idx2logits, score_cf, is_filter_fn):
 
     # re-write train set
     fname, fext = os.path.splitext(train_file)
-    train_clean_pos_file = fname + ".pos.cf" + str(score_cf) + fext
+    if train_file == ori_train_file:
+        train_clean_pos_file = fname + "." + modeltype_str + ".pos.cf" + str(score_cf) + fext
+    else:
+        train_clean_pos_file = fname + ".pos.cf" + str(score_cf) + fext
     wfp = open(train_clean_pos_file, 'w')
     if is_filter_fn:
-        train_clean_neg_file = fname + ".neg.cf" + str(score_cf) + fext
+        if train_file == ori_train_file:
+            train_clean_neg_file = fname + "." + modeltype_str + ".neg.cf" + str(score_cf) + fext
+        else:
+            train_clean_neg_file = fname + ".neg.cf" + str(score_cf) + fext
         wfn = open(train_clean_neg_file, 'w')
     lidx = 0
     with open(train_file, 'r') as rf:
@@ -266,9 +277,9 @@ def clean_samples(train_file, idx2logits, score_cf, is_filter_fn):
         return train_clean_pos_file, left_ratio, None
 
 
-def _get_all_negative_samples(train_file):
+def _get_all_negative_samples(train_file, modeltype_str):
     fname, fext = os.path.splitext(train_file)
-    train_neg_file = fname + ".neg_all" + fext
+    train_neg_file = fname + ".neg_all" + "." + modeltype_str + fext
 
     wf = open(train_neg_file, "w")
     with open(train_file, 'r') as rf:
@@ -287,47 +298,55 @@ def denoise(args):
     iterations = args.iterations
 
     train_file = args.train_file
+    modeltype_str = get_model_type_str(args.model_type, str2bool(args.is_base), str2bool(args.is_signallen))
 
     # filter neg samples ===
-    train_neg_file = _get_all_negative_samples(train_file)
+    train_neg_file = _get_all_negative_samples(train_file, modeltype_str)
 
     for iter_c in range(iterations):
         print("\n###### cross rank to clean samples, Iter: {} ######".format(iter_c + 1))
         # cross rank
         iterstr = str(iter_c + 1)
-        idxs2logtis_all = train_rounds(train_file, iterstr, args)
+        idxs2logtis_all = train_rounds(train_file, iterstr, args, modeltype_str)
 
         is_filter_fn = str2bool(args.is_filter_fn)
         train_clean_pos_file, left_ratio, train_clean_neg_file = clean_samples(train_file, idxs2logtis_all,
-                                                                               args.score_cf, is_filter_fn)
-
+                                                                               args.score_cf, is_filter_fn,
+                                                                               args.train_file, modeltype_str)
         if train_file != args.train_file:
             os.remove(train_file)
 
         # concat new train_file
         print("\n#####concat denoied file#####")
         pos_num = count_line_num(train_clean_pos_file)
-        fname, fext = os.path.splitext(train_neg_file)
-        train_seled_neg_file = fname + ".r" + str(pos_num) + fext
-        if train_clean_neg_file is None:
-            select_negsamples_asposkmer(train_clean_pos_file, train_neg_file, train_seled_neg_file)
-        else:
-            neg_num = count_line_num(train_clean_neg_file)
-            if pos_num <= neg_num:
-                select_negsamples_asposkmer(train_clean_pos_file, train_clean_neg_file, train_seled_neg_file)
-                os.remove(train_clean_neg_file)
+        if pos_num > 0:
+            fname, fext = os.path.splitext(train_neg_file)
+            train_seled_neg_file = fname + ".r" + str(pos_num) + fext
+            if train_clean_neg_file is None:
+                select_negsamples_asposkmer(train_clean_pos_file, train_neg_file, train_seled_neg_file)
+            else:
+                neg_num = count_line_num(train_clean_neg_file)
+                if pos_num <= neg_num:
+                    select_negsamples_asposkmer(train_clean_pos_file, train_clean_neg_file, train_seled_neg_file)
+                    os.remove(train_clean_neg_file)
+                else:
+                    train_seled_neg_file = train_clean_neg_file
 
-        fname, fext = os.path.splitext(args.train_file)
-        if is_filter_fn:
-            train_file = fname + ".denoise_fpnp" + str(iter_c + 1) + fext
+            fname, fext = os.path.splitext(args.train_file)
+            if is_filter_fn:
+                train_file = fname + "." + modeltype_str + ".denoise_fpnp" + str(iter_c + 1) + fext
+            else:
+                train_file = fname + "." + modeltype_str + ".denoise_fp" + str(iter_c + 1) + fext
+            concat_two_files(train_clean_pos_file, train_seled_neg_file, concated_fp=train_file)
+            os.remove(train_seled_neg_file)
         else:
-            train_file = fname + ".denoise_fp" + str(iter_c + 1) + fext
-        concat_two_files(train_clean_pos_file, train_seled_neg_file, concated_fp=train_file)
-        os.remove(train_seled_neg_file)
+            if train_clean_neg_file is not None:
+                os.remove(train_clean_neg_file)
+            print("WARING: The denoise module denoised all samples in the train_file!!!")
         os.remove(train_clean_pos_file)
         print("#####concat denoied file, finished!#####")
 
-        if left_ratio > 0.99:
+        if left_ratio > 0.99 or pos_num == 0:
             break
 
     os.remove(train_neg_file)
@@ -387,10 +406,10 @@ def main():
     # model training
     parser.add_argument('--batch_size', type=int, default=512, required=False)
     parser.add_argument('--lr', type=float, default=0.001, required=False)
-    parser.add_argument('--epoch_num', type=int, default=5, required=False)
+    parser.add_argument('--epoch_num', type=int, default=3, required=False)
     parser.add_argument('--step_interval', type=int, default=100, required=False)
-    parser.add_argument('--iterations', type=int, default=6, required=False)
-    parser.add_argument('--rounds', type=int, default=5, required=False)
+    parser.add_argument('--iterations', type=int, default=10, required=False)
+    parser.add_argument('--rounds', type=int, default=3, required=False)
     parser.add_argument("--score_cf", type=float, default=0.5,
                         required=False,
                         help="score cutoff")
