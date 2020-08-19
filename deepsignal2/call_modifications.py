@@ -40,7 +40,7 @@ from utils.constants_torch import use_cuda
 import uuid
 
 queen_size_border = 2000
-queen_size_border_f5batch = 50
+queen_size_border_f5batch = 100
 time_wait = 3
 
 
@@ -125,8 +125,8 @@ def _call_mods(features_batch, model, batch_size):
             for idx in range(len(b_sampleinfo)):
                 # chromosome, pos, strand, pos_in_strand, read_name, read_strand, prob_0, prob_1, called_label, seq
                 prob_0, prob_1 = logits[idx][0], logits[idx][1]
-                prob_0_norm = prob_0 / (prob_0 + prob_1)
-                prob_1_norm = prob_1 / (prob_0 + prob_1)
+                prob_0_norm = round(prob_0 / (prob_0 + prob_1), 6)
+                prob_1_norm = round(prob_1 / (prob_0 + prob_1), 6)
                 pred_str.append("\t".join([b_sampleinfo[idx], str(prob_0_norm),
                                            str(prob_1_norm), str(predicted[idx]),
                                            ''.join([code2base_dna[x] for x in b_kmers[idx]])]))

@@ -53,7 +53,7 @@ def write_sitekey2stats(sitekey2stats, result_file):
             assert(sitestats._coverage == (sitestats._met + sitestats._unmet))
             if sitestats._coverage > 0:
                 rmet = float(sitestats._met) / sitestats._coverage
-                wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.3f\t%s\n" % (chrom, pos, sitestats._strand,
+                wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
                                                                                  sitestats._pos_in_strand,
                                                                                  sitestats._prob_0,
                                                                                  sitestats._prob_1,

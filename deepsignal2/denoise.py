@@ -346,7 +346,7 @@ def denoise(args):
         os.remove(train_clean_pos_file)
         print("#####concat denoied file, finished!#####")
 
-        if left_ratio > 0.99 or pos_num == 0:
+        if left_ratio >= 0.99 or pos_num == 0:
             break
 
     os.remove(train_neg_file)
