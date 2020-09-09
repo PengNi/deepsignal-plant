@@ -94,7 +94,7 @@ def ResNet3(out_channels=128, strides=(1, 2, 2), init_channels=1, in_planes=4):
 
 # model ===============================================
 class ModelBiLSTM(nn.Module):
-    def __init__(self, seq_len=11, signal_len=16, num_layers1=3, num_layers2=1, num_classes=2,
+    def __init__(self, seq_len=13, signal_len=16, num_layers1=3, num_layers2=1, num_classes=2,
                  dropout_rate=0.5, hidden_size=256,
                  vocab_size=16, embedding_size=4, is_base=True, is_signallen=True,
                  module="both_bilstm"):

@@ -179,7 +179,8 @@ def main():
                         required=False,
                         help="type of model to use, 'both_bilstm', 'seq_bilstm' or 'signal_bilstm', "
                              "'both_bilstm' means to use both seq and signal bilstm, default: both_bilstm")
-    parser.add_argument('--seq_len', type=int, default=11, required=False)
+    parser.add_argument('--seq_len', type=int, default=13, required=False,
+                        help="len of kmer. default 13")
     parser.add_argument('--signal_len', type=int, default=16, required=False,
                         help="the number of signals of one base to be used in deepsignal, default 16")
 

@@ -533,8 +533,8 @@ def main():
                                help="the label of the interested modified bases, this is for training."
                                     " 0 or 1, default 1")
     ep_extraction.add_argument("--seq_len", action="store",
-                               type=int, required=False, default=11,
-                               help="len of kmer. default 11")
+                               type=int, required=False, default=13,
+                               help="len of kmer. default 13")
     ep_extraction.add_argument("--signal_len", action="store",
                                type=int, required=False, default=16,
                                help="the number of signals of one base to be used in deepsignal, default 16")

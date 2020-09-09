@@ -410,6 +410,8 @@ def call_mods(args):
     start = time.time()
 
     model_path = os.path.abspath(args.model_path)
+    if not os.path.exists(model_path):
+        raise ValueError("--model_path is not set right!")
     input_path = os.path.abspath(args.input_path)
     success_file = input_path.rstrip("/") + "." + str(uuid.uuid1()) + ".success"
     if os.path.exists(success_file):
@@ -497,7 +499,8 @@ def main():
                         required=False,
                         help="type of model to use, 'both_bilstm', 'seq_bilstm' or 'signal_bilstm', "
                              "'both_bilstm' means to use both seq and signal bilstm, default: both_bilstm")
-    p_call.add_argument('--seq_len', type=int, default=11, required=False)
+    p_call.add_argument('--seq_len', type=int, default=13, required=False,
+                        help="len of kmer. default 13")
     p_call.add_argument('--signal_len', type=int, default=16, required=False,
                         help="signal num of one base, default 16")
 
