@@ -269,6 +269,9 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         nproc = 2
     elif nproc > 2:
         nproc -= 1
+    if nproc_gpu < 1:
+        nproc_gpu = 1
+    assert nproc > nproc_gpu
 
     fast5s_q.put("kill")
     features_batch_procs = []
@@ -369,7 +372,9 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     pred_str_q = Queue()
 
     nproc = args.nproc
-    if nproc > 1:
+    if nproc < 1:
+        nproc = 1
+    elif nproc > 1:
         nproc -= 1
 
     pred_str_procs = []
@@ -413,6 +418,8 @@ def call_mods(args):
     if not os.path.exists(model_path):
         raise ValueError("--model_path is not set right!")
     input_path = os.path.abspath(args.input_path)
+    if not os.path.exists(input_path):
+        raise ValueError("--input_path does not exist!")
     success_file = input_path.rstrip("/") + "." + str(uuid.uuid1()) + ".success"
     if os.path.exists(success_file):
         os.remove(success_file)
@@ -444,11 +451,15 @@ def call_mods(args):
 
         predstr_procs = []
         nproc = args.nproc
-        if nproc > 2:
+        if nproc < 1:
+            nproc = 1
+        elif nproc > 2:
             nproc -= 2
 
         if use_cuda:
             nproc_dp = args.nproc_gpu
+            if nproc_dp < 1:
+                nproc_dp = 1
         else:
             nproc_dp = nproc
 
