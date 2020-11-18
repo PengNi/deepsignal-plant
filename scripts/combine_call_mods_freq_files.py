@@ -41,9 +41,12 @@ def _get_combined_freq_file(freqfiles):
     return freqinfo
 
 
-def _write_freqinfo(freqinfo, wfile):
+def _write_freqinfo(freqinfo, wfile, is_sort):
     wf = open(wfile, "w")
-    fkeys = sorted(list(freqinfo.keys()))
+    if is_sort:
+        fkeys = sorted(list(freqinfo.keys()))
+    else:
+        fkeys = list(freqinfo.keys())
     for fkey in fkeys:
         tmpinfo = list(fkey) + freqinfo[fkey]
         wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (tmpinfo[0], tmpinfo[1], tmpinfo[2],
@@ -59,7 +62,7 @@ def _write_freqinfo(freqinfo, wfile):
 def combine_freq_files(args):
     modsfiles = args.modsfile
     freqinfo = _get_combined_freq_file(modsfiles)
-    _write_freqinfo(freqinfo, args.wfile)
+    _write_freqinfo(freqinfo, args.wfile, args.sort)
 
 
 def main():
@@ -68,6 +71,7 @@ def main():
                         help="call_mods_freq file")
     parser.add_argument("--wfile", type=str, required=True,
                         help="")
+    parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
 
     args = parser.parse_args()
     combine_freq_files(args)
