@@ -53,13 +53,19 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
     # Get Events
     try:
         event = fast5_data['/Analyses/'+correct_group + '/' + correct_subgroup + '/Events']
-        corr_attrs = dict(list(event.attrs.items()))
+        # print(event)
     except Exception:
         raise RuntimeError('events not found.')
 
-    read_start_rel_to_raw = corr_attrs['read_start_rel_to_raw']
-    # print(event)
-    # print('read_start_rel_to_raw: ',read_start_rel_to_raw)
+    try:
+        corr_attrs = dict(list(event.attrs.items()))
+        read_start_rel_to_raw = corr_attrs['read_start_rel_to_raw']
+        # print('read_start_rel_to_raw: ',read_start_rel_to_raw)
+        starts = list(map(lambda x: x + read_start_rel_to_raw, event['start']))
+    except KeyError:
+        # starts = list(map(lambda x: x, event['start']))
+        raise KeyError('no read_start_rel_to_raw in event attributes')
+
     starts = list(map(lambda x: x+read_start_rel_to_raw, event['start']))
     lengths = event['length'].astype(np.int)
     base = [x.decode("UTF-8") for x in event['base']]

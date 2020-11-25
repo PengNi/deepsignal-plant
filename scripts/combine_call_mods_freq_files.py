@@ -1,5 +1,6 @@
 #! /usr/bin/python
 import argparse
+import os
 
 
 def _read_one_mod_freq_file(freqfile):
@@ -60,17 +61,35 @@ def _write_freqinfo(freqinfo, wfile, is_sort):
 
 
 def combine_freq_files(args):
-    modsfiles = args.modsfile
+    modspaths = args.modspath
+    file_uid = args.file_uid
+    modsfiles = []
+    for ipath in modspaths:
+        input_path = os.path.abspath(ipath)
+        if os.path.isdir(input_path):
+            for ifile in os.listdir(input_path):
+                if file_uid is None:
+                    modsfiles.append('/'.join([input_path, ifile]))
+                elif ifile.find(file_uid) != -1:
+                    modsfiles.append('/'.join([input_path, ifile]))
+        elif os.path.isfile(input_path):
+            modsfiles.append(input_path)
+        else:
+            raise ValueError()
+    print("get {} input file(s)..".format(len(modsfiles)))
     freqinfo = _get_combined_freq_file(modsfiles)
     _write_freqinfo(freqinfo, args.wfile, args.sort)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--modsfile", action="append", type=str, required=True,
-                        help="call_mods_freq file")
+    parser.add_argument("--modspath", action="append", type=str, required=True,
+                        help="call_mods_freq file or dir")
     parser.add_argument("--wfile", type=str, required=True,
                         help="")
+    parser.add_argument('--file_uid', type=str, action="store", required=False, default=None,
+                        help='a unique str which all input files has, this is for finding all input files and ignoring '
+                             'the un-input-files in a input directory. if input_path is a file, ignore this arg.')
     parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
 
     args = parser.parse_args()

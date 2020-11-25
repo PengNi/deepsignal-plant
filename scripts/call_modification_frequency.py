@@ -37,7 +37,7 @@ def calculate_mods_frequency(mods_files, prob_cf):
                         sitekey2stats[mod_record._site_key]._unmet += 1
                     used += 1
                 count += 1
-    print("{} of {} samples used..".format(used, count))
+    print("{:.2f}% ({} of {}) calls used..".format(used/float(count) * 100, used, count))
     return sitekey2stats
 
 
