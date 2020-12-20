@@ -2,15 +2,15 @@
 
 
 ## A deep-learning method for detecting DNA methylation state from Oxford Nanopore sequencing reads.
-DeepSignal2 BiLSTM+Inception structure to detect DNA methylation state from Nanopore reads. It is
-built with **Python3** and **Pytorch**.
+DeepSignal2 applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
+built on **Python3** and **Pytorch**.
 
 ## Contents
 - [Installation](#Installation)
 - [Quick start](#Quick-start)
 
 ## Installation
-deepsignal2 is built on Python3. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal.
+deepsignal2 is built on Python3 and Pytorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
        [PyTorch](https://pytorch.org/) (version not tested)\
@@ -37,6 +37,7 @@ The virtual environment can also be created by using [virtualenv](https://github
 - After creating and activating the environment, download deepsignal2 (**lastest version**) from github:
 ```bash
 git clone https://github.com/PengNi/deepsignal2.git
+# install requirements
 ```
 
 - [tombo](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
