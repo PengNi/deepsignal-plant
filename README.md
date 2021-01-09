@@ -10,7 +10,7 @@ built on **Python3** and **Pytorch**.
 - [Quick start](#Quick-start)
 
 ## Installation
-deepsignal2 is built on Python3 and Pytorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal.
+deepsignal2 is built on Python3 and PyTorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
        [PyTorch](https://pytorch.org/) (version not tested)\
@@ -71,13 +71,13 @@ tombo resquiggle fast5s/ /path/to/reference/genome.fa --processes 10 --corrected
 # we call CG, CHG, CHH methylation separately
 # CG
 CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model/.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv --prob_cf 0.8
+python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
 # CHG
 CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model/.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv --prob_cf 0.8
+python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
 # CHH
 CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model/.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv --prob_cf 0.8
+python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
 ```
 Note:
 - If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).

@@ -41,7 +41,7 @@ def calculate_mods_frequency(mods_files, prob_cf):
     return sitekey2stats
 
 
-def write_sitekey2stats(sitekey2stats, result_file, is_sort):
+def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
     if is_sort:
         keys = sorted(list(sitekey2stats.keys()), key=lambda x: split_key(x))
     else:
@@ -56,13 +56,19 @@ def write_sitekey2stats(sitekey2stats, result_file, is_sort):
             assert(sitestats._coverage == (sitestats._met + sitestats._unmet))
             if sitestats._coverage > 0:
                 rmet = float(sitestats._met) / sitestats._coverage
-                wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
-                                                                                 sitestats._pos_in_strand,
-                                                                                 sitestats._prob_0,
-                                                                                 sitestats._prob_1,
-                                                                                 sitestats._met, sitestats._unmet,
-                                                                                 sitestats._coverage, rmet,
-                                                                                 sitestats._kmer))
+                if is_bed:
+                    wf.write("\t".join([chrom, str(pos), str(pos + 1), ".", str(sitestats._coverage),
+                                        sitestats._strand,
+                                        str(pos), str(pos + 1), "0,0,0", str(sitestats._coverage),
+                                        str(int(round(rmet * 100, 0)))]) + "\n")
+                else:
+                    wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
+                                                                                     sitestats._pos_in_strand,
+                                                                                     sitestats._prob_0,
+                                                                                     sitestats._prob_1,
+                                                                                     sitestats._met, sitestats._unmet,
+                                                                                     sitestats._coverage, rmet,
+                                                                                     sitestats._kmer))
             else:
                 print("{} {} has no coverage..".format(chrom, pos))
 
@@ -74,6 +80,8 @@ def main():
                              'result files.')
     parser.add_argument('--result_file', '-o', action="store", type=str, required=True,
                         help='the file path to save the result')
+    parser.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
+    parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
     parser.add_argument('--prob_cf', type=float, action="store", required=False, default=0.8,
                         help='this is to remove ambiguous calls. '
                              'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
@@ -81,7 +89,7 @@ def main():
     parser.add_argument('--file_uid', type=str, action="store", required=False, default=None,
                         help='a unique str which all input files has, this is for finding all input files and ignoring '
                              'the un-input-files in a input directory. if input_path is a file, ignore this arg.')
-    parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
+
     args = parser.parse_args()
 
     input_paths = args.input_path
