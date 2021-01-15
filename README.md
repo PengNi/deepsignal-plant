@@ -1,8 +1,8 @@
-# DeepSignal_Plant
+# deepsignal-plant
 
 
 ## A deep-learning method for detecting DNA methylation state from Oxford Nanopore sequencing reads.
-DeepSignal_Plant applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
+deepsignal-plant applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
 built on **Python3** and **Pytorch**.
 
 ## Contents
@@ -10,7 +10,7 @@ built on **Python3** and **Pytorch**.
 - [Quick start](#Quick-start)
 
 ## Installation
-deepsignal2 is built on Python3 and PyTorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal.
+deepsignal-plant is built on Python3 and PyTorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
        [PyTorch](https://pytorch.org/) (version not tested)\
