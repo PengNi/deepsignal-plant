@@ -1,8 +1,8 @@
-# DeepSignal2
+# DeepSignal_Plant
 
 
 ## A deep-learning method for detecting DNA methylation state from Oxford Nanopore sequencing reads.
-DeepSignal2 applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
+DeepSignal_Plant applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
 built on **Python3** and **Pytorch**.
 
 ## Contents
