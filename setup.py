@@ -39,10 +39,10 @@ long_description = read('README.rst')
 
 
 setup(
-    name='deepsignal2',
-    packages=['deepsignal2'],
+    name='deepsignal-plant',
+    packages=['deepsignal-plant'],
     keywords=['methylation', 'nanopore', 'neural network'],
-    version=find_version('deepsignal', '__init__.py'),
+    version=find_version('deepsignal-plant', '__init__.py'),
     url='',
     download_url='',
     license='GNU General Public License v3 (GPLv3)',
@@ -52,6 +52,7 @@ setup(
                       'h5py>=2.8.0',
                       'statsmodels>=0.9.0',
                       'scikit-learn>=0.20.1',
+                      'torch>=1.2.0,<=1.5',
                       ],
     # cmdclass={'test': PyTest},
     author_email='543943952@qq.com',
@@ -59,7 +60,7 @@ setup(
     long_description=long_description,
     entry_points={
         'console_scripts': [
-            'deepsignal2=deepsignal2.deepsignal2:main',
+            'deepsignal_plant=deepsignal-plant.deepsignal-plant:main',
             ],
         },
     platforms='any',
@@ -77,5 +78,4 @@ setup(
     # extras_require={
     #     'testing': ['pytest'],
     #   },
-    # scripts=['deepsignal/deepsignal.py'],
 )

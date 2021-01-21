@@ -1,25 +1,26 @@
-# deepsignal-plant
+# DeepSignal-plant
 
 
-## A deep-learning method for detecting DNA methylation state from Oxford Nanopore sequencing reads.
-deepsignal-plant applys BiLSTM structure to detect DNA methylation state from Nanopore reads. It is
+## A deep-learning method for detecting DNA 5mC methylation from Oxford Nanopore sequencing reads of plants.
+deepsignal-plant applys BiLSTM to detect DNA methylation state from Nanopore reads. It is
 built on **Python3** and **Pytorch**.
 
 ## Contents
 - [Installation](#Installation)
 - [Quick start](#Quick-start)
+- [Usage](#Usage)
 
 ## Installation
 deepsignal-plant is built on Python3 and PyTorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
-       [PyTorch](https://pytorch.org/) (version not tested)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
    - Dependencies:\
        [numpy](http://www.numpy.org/)\
        [h5py](https://github.com/h5py/h5py)\
        [statsmodels](https://github.com/statsmodels/statsmodels/)\
        [scikit-learn](https://scikit-learn.org/stable/)
+       [PyTorch](https://pytorch.org/) (version not tested)\
 
 #### 1. Create an environment
 We highly recommend to use a virtual environment for the installation of deepsignal2 and its dependencies. A virtual environment can be created and (de)activated as follows by using [conda](https://conda.io/docs/):
@@ -33,11 +34,19 @@ conda deactivate
 ```
 The virtual environment can also be created by using [virtualenv](https://github.com/pypa/virtualenv/).
 
-#### 2. Install deepsignal2
+#### 2. Install deepsignal-plant
 - After creating and activating the environment, download deepsignal2 (**lastest version**) from github:
 ```bash
 git clone https://github.com/PengNi/deepsignal2.git
 # install requirements
+```
+
+- [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
+```bash
+# install using conda
+conda install pytorch==1.4.0 torchvision==0.5.0 cudatoolkit=10.1 -c pytorch
+# or install using pip
+pip install torch==1.4.0 torchvision==0.5.0
 ```
 
 - [tombo](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
@@ -46,15 +55,6 @@ git clone https://github.com/PengNi/deepsignal2.git
 conda install -c bioconda ont-tombo
 # or install using pip
 pip install ont-tombo
-```
-
-- install [PyTorch](https://pytorch.org/) (version not tested) in the same environment:
-
-```bash
-# install using conda
-conda install pytorch==1.4.0 torchvision==0.5.0 cudatoolkit=10.1 -c pytorch
-# or install using pip
-pip install torch==1.4.0 torchvision==0.5.0
 ```
 
 
