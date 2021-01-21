@@ -7,6 +7,7 @@ built on **Python3** and **Pytorch**.
 
 ## Contents
 - [Installation](#Installation)
+- [Trained models](#Trained-models)
 - [Quick start](#Quick-start)
 - [Usage](#Usage)
 
@@ -58,6 +59,15 @@ pip install ont-tombo
 ```
 
 
+## Trained models
+The models we trained can be downloaded from [google drive](https://drive.google.com/drive/folders/1BJ3OTFQhGXc20KdKx9QExCvO1st96-zO?usp=sharing).
+
+Currently we have trained the following models:
+   * _model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt_: A CpG model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * _model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt_: A CHG model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * _model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt_: A CHH model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+
+
 ## Quick start
 To call modifications, the raw fast5 files should be basecalled ([Guppy>=3.6.1](https://nanoporetech.com/community)) and then be re-squiggled by [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. The following are commands to call 5mC in CG, CHG, and CHH contexts as follows:
 ```bash
@@ -70,13 +80,13 @@ tombo resquiggle fast5s/ /path/to/reference/genome.fa --processes 10 --corrected
 # 3. deepsignal call_mods
 # we call CG, CHG, CHH methylation separately
 # CG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model/.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
 # CHG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model/.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
 # CHH
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model/.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
 ```
 Note:
