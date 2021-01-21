@@ -23,12 +23,12 @@ deepsignal-plant is built on Python3 and PyTorch. [tombo](https://github.com/nan
        [PyTorch](https://pytorch.org/) (version not tested)\
 
 #### 1. Create an environment
-We highly recommend to use a virtual environment for the installation of deepsignal2 and its dependencies. A virtual environment can be created and (de)activated as follows by using [conda](https://conda.io/docs/):
+We highly recommend to use a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows by using [conda](https://conda.io/docs/):
 ```bash
 # create
-conda create -n deepsignal2env python=3.6
+conda create -n deepsignalpenv python=3.6
 # activate
-conda activate deepsignal2env
+conda activate deepsignalpenv
 # deactivate
 conda deactivate
 ```
@@ -37,7 +37,7 @@ The virtual environment can also be created by using [virtualenv](https://github
 #### 2. Install deepsignal-plant
 - After creating and activating the environment, download deepsignal2 (**lastest version**) from github:
 ```bash
-git clone https://github.com/PengNi/deepsignal2.git
+git clone https://github.com/PengNi/deepsignal-plant.git
 # install requirements
 ```
 
@@ -70,14 +70,14 @@ tombo resquiggle fast5s/ /path/to/reference/genome.fa --processes 10 --corrected
 # 3. deepsignal call_mods
 # we call CG, CHG, CHH methylation separately
 # CG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model/.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model/.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
+python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
 # CHG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model/.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model/.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
+python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
 # CHH
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal2/deepsignal2/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model/.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal2/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
+CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model/.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
+python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
 ```
 Note:
 - If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
