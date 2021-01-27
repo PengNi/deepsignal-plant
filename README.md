@@ -6,9 +6,8 @@
 [![PyPI-Downloads](https://pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
 [![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant/month)
 
-## A deep-learning method for detecting DNA 5mC methylation from Oxford Nanopore sequencing reads of plants.
-deepsignal-plant applys BiLSTM to detect DNA methylation state from Nanopore reads. It is
-built on **Python3** and **Pytorch**.
+## A deep-learning method for detecting methylation state from Oxford Nanopore sequencing reads of plants.
+deepsignal-plant applys BiLSTM to detect methylation from Nanopore reads. It is built on **Python3** and **Pytorch**.
 
 ## Contents
 - [Installation](#Installation)

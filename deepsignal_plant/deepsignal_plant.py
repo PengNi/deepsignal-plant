@@ -82,9 +82,9 @@ def main():
                                      description="detecting base modifications from Nanopore sequencing reads of "
                                                  "plants, "
                                                  "deepsignal_plant contains four modules: \n"
+                                                 "\t%(prog)s call_mods: call modifications\n"
                                                  "\t%(prog)s extract: extract features from corrected (tombo) "
                                                  "fast5s for training or testing\n"
-                                                 "\t%(prog)s call_mods: call modifications\n"
                                                  "\t%(prog)s train: train a model, need two independent "
                                                  "datasets for training and validating\n"
                                                  "\t%(prog)s denoise: denoise training samples by deep-learning, "
@@ -92,12 +92,12 @@ def main():
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     subparsers = parser.add_subparsers(title="modules", help='deepsignal_plant modules, use -h/--help for help')
+    sub_call_mods = subparsers.add_parser("call_mods", description="call modifications")
     sub_extract = subparsers.add_parser("extract", description="extract features from corrected (tombo) fast5s for "
                                                                "training or testing."
                                                                "\nIt is suggested that running this module 1 flowcell "
                                                                "a time, or a group of flowcells a time, "
                                                                "if the whole data is extremely large.")
-    sub_call_mods = subparsers.add_parser("call_mods", description="call modifications")
     sub_train = subparsers.add_parser("train", description="train a model, need two independent datasets for training "
                                                            "and validating")
     sub_denoise = subparsers.add_parser("denoise", description="train cross rank, filter false positive samples (and "
