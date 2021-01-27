@@ -77,16 +77,16 @@ cat fast5s_guppy/*.fastq > fast5s_guppy.fastq
 # 2. tombo resquiggle
 tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ --fastq-filenames fast5s_guppy.fastq --basecall-group Basecall_1D_000 --basecall-subgroup BaseCalled_template --overwrite --processes 10
 tombo resquiggle fast5s/ /path/to/reference/genome.fa --processes 10 --corrected-group RawGenomeCorrected_000 --basecall-group Basecall_1D_000 --overwrite
-# 3. deepsignal call_mods
+# 3. deepsignal-plant call_mods
 # we call CG, CHG, CHH methylation separately
 # CG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CG_model.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path /path/to/CG_model.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CG --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
 # CHG
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHG_model.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path /path/to/CHG_model.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHG --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
 # CHH
-CUDA_VISIBLE_DEVICES=0 python /path/to/deepsignal-plant/deepsignal-plant/call_modifications.py --input_path fast5s/ --model_path /path/to/CHH_model.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path /path/to/CHH_model.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path /path/to/reference/genome.fa --motifs CHH --nproc 30 --nproc_gpu 6
 python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
 ```
 Note:
