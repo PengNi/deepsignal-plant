@@ -40,13 +40,13 @@ long_description = read('README.rst')
 
 setup(
     name='deepsignal-plant',
-    packages=['deepsignal-plant'],
+    packages=['deepsignal_plant'],
     keywords=['methylation', 'nanopore', 'neural network'],
-    version=find_version('deepsignal-plant', '__init__.py'),
+    version=find_version('deepsignal_plant', '__init__.py'),
     url='',
     download_url='',
     license='GNU General Public License v3 (GPLv3)',
-    author='Peng Ni, Neng Huang',
+    author='Peng Ni',
     # tests_require=['pytest'],
     install_requires=['numpy>=1.15.3',
                       'h5py>=2.8.0',
@@ -60,7 +60,7 @@ setup(
     long_description=long_description,
     entry_points={
         'console_scripts': [
-            'deepsignal_plant=deepsignal-plant.deepsignal-plant:main',
+            'deepsignal_plant=deepsignal_plant.deepsignal_plant:main',
             ],
         },
     platforms='any',
