@@ -1,5 +1,10 @@
 # DeepSignal-plant
 
+[![Python](https://img.shields.io/pypi/pyversions/deepsignal-plant)](https://www.python.org/)
+[![PyPI version](https://img.shields.io/pypi/v/deepsignal-plant)](https://pypi.org/project/deepsignal-plant/)
+[![GitHub License](https://img.shields.io/github/license/PengNi/deepsignal-plant)](https://github.com/PengNi/deepsignal-plant/blob/master/LICENSE)
+[![PyPI-Downloads](https://pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
+[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant/month)
 
 ## A deep-learning method for detecting DNA 5mC methylation from Oxford Nanopore sequencing reads of plants.
 deepsignal-plant applys BiLSTM to detect DNA methylation state from Nanopore reads. It is
@@ -39,7 +44,12 @@ The virtual environment can also be created by using [virtualenv](https://github
 - After creating and activating the environment, download deepsignal2 (**lastest version**) from github:
 ```bash
 git clone https://github.com/PengNi/deepsignal-plant.git
-# install requirements
+cd deepsignal-plant
+python setup.py install
+```
+**or** install deepsignal using *pip*:
+```bash
+pip install deepsignal-plant
 ```
 
 - [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):

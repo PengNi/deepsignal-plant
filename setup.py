@@ -56,7 +56,8 @@ setup(
                       ],
     # cmdclass={'test': PyTest},
     author_email='543943952@qq.com',
-    description='a',
+    description='A deep-learning method for detecting DNA methylation state '
+                'from Oxford Nanopore sequencing reads of plants',
     long_description=long_description,
     entry_points={
         'console_scripts': [
