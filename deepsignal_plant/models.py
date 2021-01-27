@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import absolute_import
+
 import torch
 import torch.nn as nn
 import torch.autograd as autograd
@@ -9,7 +11,7 @@ import torch.nn.functional as F
 import torch.utils
 import torch.utils.checkpoint
 
-from utils.constants_torch import use_cuda
+from .utils.constants_torch import use_cuda
 
 
 # inner module ================================================

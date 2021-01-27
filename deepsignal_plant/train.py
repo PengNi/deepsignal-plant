@@ -10,13 +10,13 @@ import sys
 import time
 import re
 
-from models import ModelBiLSTM
-from dataloader import SignalFeaData2
-from dataloader import clear_linecache
-from utils.process_utils import display_args
-from utils.process_utils import str2bool
+from .models import ModelBiLSTM
+from .dataloader import SignalFeaData2
+from .dataloader import clear_linecache
+from .utils.process_utils import display_args
+from .utils.process_utils import str2bool
 
-from utils.constants_torch import use_cuda
+from .utils.constants_torch import use_cuda
 
 
 def train(args):

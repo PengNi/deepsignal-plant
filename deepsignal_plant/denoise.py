@@ -10,19 +10,19 @@ from sklearn import metrics
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
-from models import ModelBiLSTM
-from dataloader import SignalFeaData2
-from dataloader import clear_linecache
+from .models import ModelBiLSTM
+from .dataloader import SignalFeaData2
+from .dataloader import clear_linecache
 
-from utils.constants_torch import use_cuda
-from utils.process_utils import str2bool
-from utils.process_utils import random_select_file_rows_s
+from .utils.constants_torch import use_cuda
+from .utils.process_utils import str2bool
+from .utils.process_utils import random_select_file_rows_s
 # from utils.process_utils import random_select_file_rows
-from utils.process_utils import count_line_num
-from utils.process_utils import concat_two_files
+from .utils.process_utils import count_line_num
+from .utils.process_utils import concat_two_files
 
-from utils.process_utils import select_negsamples_asposkmer
-from utils.process_utils import get_model_type_str
+from .utils.process_utils import select_negsamples_asposkmer
+from .utils.process_utils import get_model_type_str
 
 
 def train_1time(train_file, valid_file, valid_lidxs, args):
@@ -234,8 +234,8 @@ def clean_samples(train_file, idx2logits, score_cf, is_filter_fn, ori_train_file
             if idx2prob[1] < score_cf:
                 neg_hc.add(idx2prob[0])
 
-    left_ratio = float(len(pos_hc)) / len(idx2prob_pos)
-    left_ratio2 = float(len(neg_hc)) / len(idx2prob_neg)
+    left_ratio = float(len(pos_hc)) / len(idx2prob_pos) if len(idx2prob_pos) > 0 else 0
+    left_ratio2 = float(len(neg_hc)) / len(idx2prob_neg) if len(idx2prob_neg) > 0 else 0
     print("{} ({}) high quality positive samples left, "
           "{} ({}) high quality negative samples left".format(len(pos_hc),
                                                               left_ratio,
@@ -366,19 +366,19 @@ def display_args(args):
 
 
 def main():
-    parser = argparse.ArgumentParser("train cross rank, filter false positive samples. (And "
-                                     "false negative samples.)")
+    parser = argparse.ArgumentParser("train cross rank, filter false positive samples (and "
+                                     "false negative samples).")
     parser.add_argument('--train_file', type=str, required=True)
 
     parser.add_argument('--is_filter_fn', type=str, default="no", required=False,
-                        help="is filter false negative samples, default no")
+                        help="is filter false negative samples, 'yes' or 'no', default no")
 
     # model input
-    parser.add_argument('--model_type', type=str, default="both_bilstm",
+    parser.add_argument('--model_type', type=str, default="signal_bilstm",
                         choices=["both_bilstm", "seq_bilstm", "signal_bilstm"],
                         required=False,
                         help="type of model to use, 'both_bilstm', 'seq_bilstm' or 'signal_bilstm', "
-                             "'both_bilstm' means to use both seq and signal bilstm, default: both_bilstm")
+                             "'both_bilstm' means to use both seq and signal bilstm, default: signal_bilstm")
     parser.add_argument('--seq_len', type=int, default=13, required=False,
                         help="len of kmer. default 13")
     parser.add_argument('--signal_len', type=int, default=16, required=False,

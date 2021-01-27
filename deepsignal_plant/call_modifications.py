@@ -25,17 +25,17 @@ except RuntimeError:
 from torch.multiprocessing import Queue
 import time
 
-from models import ModelBiLSTM
-from utils.process_utils import base2code_dna
-from utils.process_utils import code2base_dna
-from utils.process_utils import str2bool
-from utils.process_utils import display_args
+from .models import ModelBiLSTM
+from .utils.process_utils import base2code_dna
+from .utils.process_utils import code2base_dna
+from .utils.process_utils import str2bool
+from .utils.process_utils import display_args
 
-from extract_features import _extract_features
-from extract_features import _extract_preprocess
+from .extract_features import _extract_features
+from .extract_features import _extract_preprocess
 
-from utils.constants_torch import FloatTensor
-from utils.constants_torch import use_cuda
+from .utils.constants_torch import FloatTensor
+from .utils.constants_torch import use_cuda
 
 import uuid
 
