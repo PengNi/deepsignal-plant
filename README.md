@@ -16,7 +16,7 @@ deepsignal-plant applys BiLSTM to detect methylation from Nanopore reads. It is 
 - [Usage](#Usage)
 
 ## Installation
-deepsignal-plant is built on Python3 and PyTorch. [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
+deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
@@ -24,7 +24,7 @@ deepsignal-plant is built on Python3 and PyTorch. [tombo](https://github.com/nan
        [numpy](http://www.numpy.org/)\
        [h5py](https://github.com/h5py/h5py)\
        [statsmodels](https://github.com/statsmodels/statsmodels/)\
-       [scikit-learn](https://scikit-learn.org/stable/)
+       [scikit-learn](https://scikit-learn.org/stable/)\
        [PyTorch](https://pytorch.org/) (version not tested)\
 
 #### 1. Create an environment
@@ -40,13 +40,13 @@ conda deactivate
 The virtual environment can also be created by using [virtualenv](https://github.com/pypa/virtualenv/).
 
 #### 2. Install deepsignal-plant
-- After creating and activating the environment, download deepsignal2 (**lastest version**) from github:
+- After creating and activating the environment, download deepsignal-plant (**lastest version**) from github:
 ```bash
 git clone https://github.com/PengNi/deepsignal-plant.git
 cd deepsignal-plant
 python setup.py install
 ```
-**or** install deepsignal using *pip*:
+**or** install deepsignal-plant using *pip*:
 ```bash
 pip install deepsignal-plant
 ```

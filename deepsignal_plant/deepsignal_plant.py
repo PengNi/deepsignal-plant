@@ -81,7 +81,7 @@ def main():
     parser = argparse.ArgumentParser(prog='deepsignal_plant',
                                      description="detecting base modifications from Nanopore sequencing reads of "
                                                  "plants, "
-                                                 "deepsignal_plant contains four modules: \n"
+                                                 "deepsignal_plant contains four modules:\n"
                                                  "\t%(prog)s call_mods: call modifications\n"
                                                  "\t%(prog)s extract: extract features from corrected (tombo) "
                                                  "fast5s for training or testing\n"
