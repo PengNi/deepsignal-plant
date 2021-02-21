@@ -266,9 +266,6 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
     nproc = args.nproc
     nproc_gpu = args.nproc_gpu
-    if nproc < 3:
-        print("--nproc must be >= 3!!")
-        nproc = 3
     if nproc_gpu < 1:
         nproc_gpu = 1
     if nproc <= nproc_gpu + 1:
