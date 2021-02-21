@@ -513,16 +513,16 @@ def call_mods(args):
         pred_str_q = Queue()
 
         predstr_procs = []
-        nproc = args.nproc
-        if nproc < 3:
-            print("--nproc must be >= 3!!")
-            nproc = 3
 
         if use_cuda:
             nproc_dp = args.nproc_gpu
             if nproc_dp < 1:
                 nproc_dp = 1
         else:
+            nproc = args.nproc
+            if nproc < 3:
+                print("--nproc must be >= 3!!")
+                nproc = 3
             nproc_dp = nproc - 2
             if nproc_dp > nproc_to_call_mods_in_cpu_mode:
                 nproc_dp = nproc_to_call_mods_in_cpu_mode
