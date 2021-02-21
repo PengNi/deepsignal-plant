@@ -26,7 +26,7 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [h5py](https://github.com/h5py/h5py)\
        [statsmodels](https://github.com/statsmodels/statsmodels/)\
        [scikit-learn](https://scikit-learn.org/stable/)\
-       [PyTorch](https://pytorch.org/) (version not tested)\
+       [PyTorch](https://pytorch.org/) (version not tested)
 
 #### 1. Create an environment
 We highly recommend to use a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows by using [conda](https://conda.io/docs/):

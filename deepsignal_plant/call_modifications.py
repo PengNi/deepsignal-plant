@@ -340,7 +340,7 @@ def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
     accuracy_list = []
     batch_num_total = 0
     f5_num = 0
-    fast5s_q.put("kill")
+    # fast5s_q.put("kill")
     while True:
         if fast5s_q.empty():
             time.sleep(time_wait)
@@ -377,6 +377,7 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     elif nproc > 1:
         nproc -= 1
 
+    fast5s_q.put("kill")
     pred_str_procs = []
     for _ in range(nproc):
         p = mp.Process(target=_fast5s_q_to_pred_str_q, args=(fast5s_q, errornum_q, pred_str_q,
