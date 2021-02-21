@@ -30,6 +30,7 @@ from .utils.process_utils import base2code_dna
 from .utils.process_utils import code2base_dna
 from .utils.process_utils import str2bool
 from .utils.process_utils import display_args
+from .utils.process_utils import nproc_to_call_mods_in_cpu_mode
 
 from .extract_features import _extract_features
 from .extract_features import _extract_preprocess
@@ -265,17 +266,18 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
     nproc = args.nproc
     nproc_gpu = args.nproc_gpu
-    if nproc < 2:
-        nproc = 2
-    elif nproc > 2:
-        nproc -= 1
+    if nproc < 3:
+        print("--nproc must be >= 3!!")
+        nproc = 3
     if nproc_gpu < 1:
         nproc_gpu = 1
-    assert nproc > nproc_gpu
+    if nproc <= nproc_gpu + 1:
+        print("--nproc must be >= --nproc_gpu + 2!!")
+        nproc = nproc_gpu + 1 + 1
 
     fast5s_q.put("kill")
     features_batch_procs = []
-    for _ in range(nproc - nproc_gpu):
+    for _ in range(nproc - nproc_gpu - 1):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
                                                              motif_seqs, chrom2len, positions,
                                                              args))
@@ -319,73 +321,38 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
 
 
-def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
-                            motif_seqs, chrom2len, model_path, positions, args):
-    print('call_mods process-{} starts'.format(os.getpid()))
-    model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
-                        args.dropout_rate, args.hid_rnn,
-                        args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
-                        args.model_type)
-    # this function is designed for CPU, disable cuda
-    # if use_cuda:
-    #     model = model.cuda()
-
-    para_dict = torch.load(model_path, map_location=torch.device('cpu'))
-    model_dict = model.state_dict()
-    model_dict.update(para_dict)
-    model.load_state_dict(model_dict)
-
-    model.eval()
-
-    accuracy_list = []
-    batch_num_total = 0
-    f5_num = 0
-    # fast5s_q.put("kill")
-    while True:
-        if fast5s_q.empty():
-            time.sleep(time_wait)
-        fast5s = fast5s_q.get()
-        if fast5s == "kill":
-            fast5s_q.put("kill")
-            break
-        f5_num += len(fast5s)
-        features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
-                                                             args)
-        errornum_q.put(error)
-        for features_batch in features_batches:
-            pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
-
-            pred_str_q.put(pred_str)
-            accuracy_list.append(accuracy)
-            batch_num_total += batch_num
-    # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
-    print('call_mods process-{} ending, proceed {} fast5s ({} batches)'.format(os.getpid(), f5_num, batch_num_total))
-
-
-def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
-                               success_file, args):
-
+def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+                                success_file, args):
+    # features_batch_q = mp.Queue()
     # errornum_q = mp.Queue()
+    features_batch_q = Queue()
     errornum_q = Queue()
 
     # pred_str_q = mp.Queue()
     pred_str_q = Queue()
 
     nproc = args.nproc
-    if nproc < 1:
-        nproc = 1
-    elif nproc > 1:
-        nproc -= 1
+    nproc_call_mods = nproc_to_call_mods_in_cpu_mode
+    if nproc <= nproc_call_mods + 1:
+        nproc = nproc_call_mods + 1 + 1
 
     fast5s_q.put("kill")
-    pred_str_procs = []
-    for _ in range(nproc):
-        p = mp.Process(target=_fast5s_q_to_pred_str_q, args=(fast5s_q, errornum_q, pred_str_q,
-                                                             motif_seqs, chrom2len, model_path, positions,
+    features_batch_procs = []
+    for _ in range(nproc - nproc_call_mods - 1):
+        p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
+                                                             motif_seqs, chrom2len, positions,
                                                              args))
         p.daemon = True
         p.start()
-        pred_str_procs.append(p)
+        features_batch_procs.append(p)
+
+    call_mods_gpu_procs = []
+    for _ in range(nproc_call_mods):
+        p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
+                                                                success_file, args))
+        p_call_mods_gpu.daemon = True
+        p_call_mods_gpu.start()
+        call_mods_gpu_procs.append(p_call_mods_gpu)
 
     # print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
@@ -394,14 +361,18 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
     errornum_sum = 0
     while True:
-        running = any(p.is_alive() for p in pred_str_procs)
+        running = any(p.is_alive() for p in features_batch_procs)
         while not errornum_q.empty():
             errornum_sum += errornum_q.get()
         if not running:
             break
 
-    for p in pred_str_procs:
+    for p in features_batch_procs:
         p.join()
+    features_batch_q.put("kill")
+
+    for p_call_mods_gpu in call_mods_gpu_procs:
+        p_call_mods_gpu.join()
 
     # print("finishing the write_process..")
     pred_str_q.put("kill")
@@ -409,6 +380,97 @@ def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     p_w.join()
 
     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
+
+
+# def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
+#                             motif_seqs, chrom2len, model_path, positions, args):
+#     print('call_mods process-{} starts'.format(os.getpid()))
+#     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
+#                         args.dropout_rate, args.hid_rnn,
+#                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
+#                         args.model_type)
+#     # this function is designed for CPU, disable cuda
+#     # if use_cuda:
+#     #     model = model.cuda()
+#
+#     para_dict = torch.load(model_path, map_location=torch.device('cpu'))
+#     model_dict = model.state_dict()
+#     model_dict.update(para_dict)
+#     model.load_state_dict(model_dict)
+#
+#     model.eval()
+#
+#     accuracy_list = []
+#     batch_num_total = 0
+#     f5_num = 0
+#     while True:
+#         if fast5s_q.empty():
+#             time.sleep(time_wait)
+#         fast5s = fast5s_q.get()
+#         if fast5s == "kill":
+#             fast5s_q.put("kill")
+#             break
+#         f5_num += len(fast5s)
+#         features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
+#                                                              args)
+#         errornum_q.put(error)
+#         for features_batch in features_batches:
+#             pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
+#
+#             pred_str_q.put(pred_str)
+#             accuracy_list.append(accuracy)
+#             batch_num_total += batch_num
+#     # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
+#     print('call_mods process-{} ending, proceed {} fast5s ({} batches)'.format(os.getpid(), f5_num, batch_num_total))
+
+
+# def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+#                                success_file, args):
+#
+#     # errornum_q = mp.Queue()
+#     errornum_q = Queue()
+#
+#     # pred_str_q = mp.Queue()
+#     pred_str_q = Queue()
+#
+#     nproc = args.nproc
+#     if nproc < 1:
+#         nproc = 1
+#     elif nproc > 1:
+#         nproc -= 1
+#
+#     fast5s_q.put("kill")
+#     pred_str_procs = []
+#     for _ in range(nproc):
+#         p = mp.Process(target=_fast5s_q_to_pred_str_q, args=(fast5s_q, errornum_q, pred_str_q,
+#                                                              motif_seqs, chrom2len, model_path, positions,
+#                                                              args))
+#         p.daemon = True
+#         p.start()
+#         pred_str_procs.append(p)
+#
+#     # print("write_process started..")
+#     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
+#     p_w.daemon = True
+#     p_w.start()
+#
+#     errornum_sum = 0
+#     while True:
+#         running = any(p.is_alive() for p in pred_str_procs)
+#         while not errornum_q.empty():
+#             errornum_sum += errornum_q.get()
+#         if not running:
+#             break
+#
+#     for p in pred_str_procs:
+#         p.join()
+#
+#     # print("finishing the write_process..")
+#     pred_str_q.put("kill")
+#
+#     p_w.join()
+#
+#     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
 
 
 def call_mods(args):
@@ -437,8 +499,8 @@ def call_mods(args):
             _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
                                        success_file, args)
         else:
-            _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
-                                       success_file, args)
+            _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+                                        success_file, args)
     else:
         # features_batch_q = mp.Queue()
         features_batch_q = Queue()
@@ -452,17 +514,18 @@ def call_mods(args):
 
         predstr_procs = []
         nproc = args.nproc
-        if nproc < 1:
-            nproc = 1
-        elif nproc > 2:
-            nproc -= 2
+        if nproc < 3:
+            print("--nproc must be >= 3!!")
+            nproc = 3
 
         if use_cuda:
             nproc_dp = args.nproc_gpu
             if nproc_dp < 1:
                 nproc_dp = 1
         else:
-            nproc_dp = nproc
+            nproc_dp = nproc - 2
+            if nproc_dp > nproc_to_call_mods_in_cpu_mode:
+                nproc_dp = nproc_to_call_mods_in_cpu_mode
 
         for _ in range(nproc_dp):
             p = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,

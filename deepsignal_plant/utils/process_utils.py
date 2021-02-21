@@ -37,6 +37,8 @@ iupac_alphabets_rna = {'A': ['A'], 'C': ['C'], 'G': ['G'], 'U': ['U'],
 
 # max_queue_size = 2000
 
+nproc_to_call_mods_in_cpu_mode = 2
+
 
 def str2bool(v):
     # susendberg's function
