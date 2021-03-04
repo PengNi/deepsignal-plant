@@ -97,6 +97,7 @@ def main():
     prob_cf = args.prob_cf
     file_uid = args.file_uid
     issort = args.sort
+    isbed = args.bed
 
     mods_files = []
     for ipath in input_paths:
@@ -116,7 +117,7 @@ def main():
     print("reading the input files..")
     sites_stats = calculate_mods_frequency(mods_files, prob_cf)
     print("writing the result..")
-    write_sitekey2stats(sites_stats, result_file, issort)
+    write_sitekey2stats(sites_stats, result_file, issort, isbed)
 
 
 if __name__ == '__main__':
