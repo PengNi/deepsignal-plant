@@ -310,7 +310,7 @@ def main():
     st_train.add_argument('--seq_len', type=int, default=13, required=False,
                           help="len of kmer. default 13")
     st_train.add_argument('--signal_len', type=int, default=16, required=False,
-                          help="the number of signals of one base to be used in deepsignal, default 16")
+                          help="the number of signals of one base to be used in deepsignal_plant, default 16")
     # model param
     st_train.add_argument('--layernum1', type=int, default=3,
                           required=False, help="lstm layer num for combined feature, default 3")
@@ -364,7 +364,7 @@ def main():
     sd_train.add_argument('--seq_len', type=int, default=13, required=False,
                           help="len of kmer. default 13")
     sd_train.add_argument('--signal_len', type=int, default=16, required=False,
-                          help="the number of signals of one base to be used in deepsignal, default 16")
+                          help="the number of signals of one base to be used in deepsignal_plant, default 16")
     # model param
     sd_train.add_argument('--layernum1', type=int, default=3,
                           required=False, help="lstm layer num for combined feature, default 3")

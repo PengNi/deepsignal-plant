@@ -1,7 +1,7 @@
-"""the feature extraction module of deepsignal.
+"""the feature extraction module of deepsignal_plant.
 output format:
 chrom, pos, alignstrand, pos_in_strand, readname, read_strand, k_mer, signal_means,
-signal_stds, signal_lens, cent_signals, methy_label
+signal_stds, signal_lens, raw_signals, methy_label
 """
 
 from __future__ import absolute_import
@@ -543,7 +543,7 @@ def main():
                                help="len of kmer. default 13")
     ep_extraction.add_argument("--signal_len", action="store",
                                type=int, required=False, default=16,
-                               help="the number of signals of one base to be used in deepsignal, default 16")
+                               help="the number of signals of one base to be used in deepsignal_plant, default 16")
     ep_extraction.add_argument("--motifs", action="store", type=str,
                                required=False, default='CG',
                                help='motif seq to be extracted, default: CG. '
