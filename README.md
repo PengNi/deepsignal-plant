@@ -100,13 +100,13 @@ tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --c
 # we call CG, CHG, CHH methylation separately
 # CG
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
+deepsignal_plant call_freq --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
 # CHG
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CHG --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
+deepsignal_plant call_freq --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
 # CHH
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CHH --nproc 30 --nproc_gpu 6
-python /path/to/deepsignal-plant/scripts/call_modification_frequency.py --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
+deepsignal_plant call_freq --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
 ```
 
 
