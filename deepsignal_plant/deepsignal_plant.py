@@ -7,6 +7,8 @@ import argparse
 from .utils.process_utils import str2bool
 from .utils.process_utils import display_args
 
+from ._version import DEEPSIGNAL_PLANT_VERSION
+
 
 def main_extraction(args):
     from .extract_features import extract_features
@@ -98,6 +100,10 @@ def main():
                                                  "\t%(prog)s denoise: denoise training samples by deep-learning, "
                                                  "filter false positive samples (and false negative samples)",
                                      formatter_class=argparse.RawTextHelpFormatter)
+    parser.add_argument(
+        '-v', '--version', action='version',
+        version='deepsignal-plant version: {}'.format(DEEPSIGNAL_PLANT_VERSION),
+        help='show deepsignal-plant version and exit.')
 
     subparsers = parser.add_subparsers(title="modules", help='deepsignal_plant modules, use -h/--help for help')
     sub_call_mods = subparsers.add_parser("call_mods", description="call modifications")

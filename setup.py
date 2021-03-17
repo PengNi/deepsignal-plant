@@ -9,30 +9,40 @@ import re
 here = os.path.abspath(os.path.dirname(__file__))
 
 
+# Get the version number from _version.py, and exe_path (learn from tombo)
+verstrline = open(os.path.join(here, 'deepsignal_plant', '_version.py'), 'r').readlines()[-1]
+vsre = r"^DEEPSIGNAL_PLANT_VERSION = ['\"]([^'\"]*)['\"]"
+mo = re.search(vsre, verstrline)
+if mo:
+    __version__ = mo.group(1)
+else:
+    raise RuntimeError('Unable to find version string in "deepsignal_plant/_version.py".')
+
+
+# def find_version(*file_paths):
+#     version_file = read(*file_paths)
+#     version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+#                               version_file, re.M)
+#     if version_match:
+#         return version_match.group(1)
+#     raise RuntimeError("Unable to find version string.")
+
+
+# class PyTest(TestCommand):
+#     def finalize_options(self):
+#         TestCommand.finalize_options(self)
+#         self.test_args = ['--strict', '--verbose', '--tb=long', 'tests']
+#         self.test_suite = True
+#
+#     def run_tests(self):
+#         import pytest
+#         errno = pytest.main(self.test_args)
+#         sys.exit(errno)
+
+
 def read(*parts):
     # intentionally *not* adding an encoding option to open
     return codecs.open(os.path.join(here, *parts), 'r').read()
-
-
-def find_version(*file_paths):
-    version_file = read(*file_paths)
-    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
-                              version_file, re.M)
-    if version_match:
-        return version_match.group(1)
-    raise RuntimeError("Unable to find version string.")
-
-
-class PyTest(TestCommand):
-    def finalize_options(self):
-        TestCommand.finalize_options(self)
-        self.test_args = ['--strict', '--verbose', '--tb=long', 'tests']
-        self.test_suite = True
-
-    def run_tests(self):
-        import pytest
-        errno = pytest.main(self.test_args)
-        sys.exit(errno)
 
 
 long_description = read('README.rst')
@@ -42,9 +52,9 @@ setup(
     name='deepsignal-plant',
     packages=['deepsignal_plant'],
     keywords=['methylation', 'nanopore', 'neural network'],
-    version=find_version('deepsignal_plant', '__init__.py'),
+    version=__version__,
     url='https://github.com/PengNi/deepsignal-plant',
-    download_url='https://github.com/PengNi/deepsignal-plant/archive/0.1.0.tar.gz',
+    download_url='https://github.com/PengNi/deepsignal-plant/archive/0.1.1.tar.gz',
     license='GNU General Public License v3 (GPLv3)',
     author='Peng Ni',
     # tests_require=['pytest'],
