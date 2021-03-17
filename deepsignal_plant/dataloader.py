@@ -3,8 +3,7 @@ import linecache
 import os
 import numpy as np
 
-base2code_dna = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 4}
-code2base_dna = {0: 'A', 1: 'C', 2: 'G', 3: 'T', 4: 'N'}
+from .utils.process_utils import base2code_dna
 
 
 def clear_linecache():

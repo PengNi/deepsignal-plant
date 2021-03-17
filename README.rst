@@ -7,7 +7,7 @@ Release
 
 0.1.1
 -----
-fix bug and optimize call_mods without GPU
+fix bug and optimize call_mods without GPU, add call_freq funciton
 
 0.1.0
 -----

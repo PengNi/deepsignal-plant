@@ -82,10 +82,10 @@ def main():
                         help='the file path to save the result')
     parser.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
     parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
-    parser.add_argument('--prob_cf', type=float, action="store", required=False, default=0.0,
+    parser.add_argument('--prob_cf', type=float, action="store", required=False, default=0.5,
                         help='this is to remove ambiguous calls. '
                              'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
-                             'means use all calls. range [0, 1], default 0.0.')
+                             'means use all calls. range [0, 1], default 0.5.')
     parser.add_argument('--file_uid', type=str, action="store", required=False, default=None,
                         help='a unique str which all input files has, this is for finding all input files and ignoring '
                              'the un-input-files in a input directory. if input_path is a file, ignore this arg.')

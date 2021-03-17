@@ -49,6 +49,12 @@ def main_call_mods(args):
     call_mods(args)
 
 
+def main_call_freq(args):
+    from .call_mods_freq import call_mods_frequency_to_file
+    display_args(args)
+    call_mods_frequency_to_file(args)
+
+
 def main_train(args):
     from .train import train
     import time
@@ -83,16 +89,19 @@ def main():
                                                  "plants, "
                                                  "deepsignal_plant contains four modules:\n"
                                                  "\t%(prog)s call_mods: call modifications\n"
+                                                 "\t%(prog)s call_freq: call frequency of modifications "
+                                                 "at genome level\n"
                                                  "\t%(prog)s extract: extract features from corrected (tombo) "
                                                  "fast5s for training or testing\n"
                                                  "\t%(prog)s train: train a model, need two independent "
                                                  "datasets for training and validating\n"
                                                  "\t%(prog)s denoise: denoise training samples by deep-learning, "
-                                                 "filter false positive samples",
+                                                 "filter false positive samples (and false negative samples)",
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     subparsers = parser.add_subparsers(title="modules", help='deepsignal_plant modules, use -h/--help for help')
     sub_call_mods = subparsers.add_parser("call_mods", description="call modifications")
+    sub_call_freq = subparsers.add_parser("call_freq", description="call frequency of modifications at genome level")
     sub_extract = subparsers.add_parser("extract", description="extract features from corrected (tombo) fast5s for "
                                                                "training or testing."
                                                                "\nIt is suggested that running this module 1 flowcell "
@@ -100,7 +109,8 @@ def main():
                                                                "if the whole data is extremely large.")
     sub_train = subparsers.add_parser("train", description="train a model, need two independent datasets for training "
                                                            "and validating")
-    sub_denoise = subparsers.add_parser("denoise", description="train cross rank, filter false positive samples (and "
+    sub_denoise = subparsers.add_parser("denoise", description="denoise training samples by deep-learning, "
+                                                               "filter false positive samples (and "
                                                                "false negative samples).")
 
     # sub_extract ============================================================================
@@ -396,6 +406,30 @@ def main():
     sd_train.add_argument('--pos_weight', type=float, default=1.0, required=False)
 
     sub_denoise.set_defaults(func=main_denoise)
+
+    # sub_call_freq =====================================================================================
+    scf_input = sub_call_freq.add_argument_group("INPUT")
+    scf_input.add_argument('--input_path', '-i', action="append", type=str, required=True,
+                           help='an output file from call_mods/call_modifications.py, or a directory contains '
+                                'a bunch of output files. this arg is in "append" mode, can be used multiple times')
+    scf_input.add_argument('--file_uid', type=str, action="store", required=False, default=None,
+                           help='a unique str which all input files has, this is for finding all input files '
+                                'and ignoring the not-input-files in a input directory. if input_path is a file, '
+                                'ignore this arg.')
+
+    scf_output = sub_call_freq.add_argument_group("OUTPUT")
+    scf_output.add_argument('--result_file', '-o', action="store", type=str, required=True,
+                            help='the file path to save the result')
+
+    scf_cal = sub_call_freq.add_argument_group("CAlCULATE")
+    scf_cal.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
+    scf_cal.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
+    scf_cal.add_argument('--prob_cf', type=float, action="store", required=False, default=0.5,
+                         help='this is to remove ambiguous calls. '
+                              'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
+                              'means use all calls. range [0, 1], default 0.5.')
+
+    sub_call_freq.set_defaults(func=main_call_freq)
 
     args = parser.parse_args()
     if hasattr(args, 'func'):
