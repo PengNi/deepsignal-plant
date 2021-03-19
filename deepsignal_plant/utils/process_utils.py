@@ -150,6 +150,7 @@ def get_fast5s(fast5_dir, is_recursive=True):
     return fast5s
 
 
+# functions for combining files and random sampling lines of txt files ================
 def count_line_num(sl_filepath, fheader=False):
     count = 0
     with open(sl_filepath, 'r') as rf:
@@ -342,6 +343,7 @@ def concat_two_files(file1, file2, concated_fp, shuffle_lines_num=2000000,
         del samples_info
         gc.collect()
     print('done concating files to: {}'.format(concated_fp))
+# =====================================================================================
 
 
 def display_args(args):

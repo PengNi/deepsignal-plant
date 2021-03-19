@@ -15,6 +15,7 @@ from .utils.constants_torch import use_cuda
 
 
 # inner module ================================================
+# https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py
 '''ResNet in PyTorch.
 
 For Pre-activation ResNet, see 'preact_resnet.py'.

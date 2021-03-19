@@ -366,7 +366,9 @@ def main():
 
     # sub_denoise =====================================================================================
     sd_input = sub_denoise.add_argument_group("INPUT")
-    sd_input.add_argument('--train_file', type=str, required=True)
+    sd_input.add_argument('--train_file', type=str, required=True, help="file containing (combined positive and "
+                                                                        "negative) samples for training. better been "
+                                                                        "balanced in kmer level.")
 
     sd_train = sub_denoise.add_argument_group("TRAIN")
     sd_train.add_argument('--is_filter_fn', type=str, default="no", required=False,

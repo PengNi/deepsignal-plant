@@ -368,7 +368,9 @@ def display_args(args):
 def main():
     parser = argparse.ArgumentParser("train cross rank, filter false positive samples (and "
                                      "false negative samples).")
-    parser.add_argument('--train_file', type=str, required=True)
+    parser.add_argument('--train_file', type=str, required=True, help="file containing (combined positive and "
+                                                                      "negative) samples for training. better been "
+                                                                      "balanced in kmer level.")
 
     parser.add_argument('--is_filter_fn', type=str, default="no", required=False,
                         help="is filter false negative samples, 'yes' or 'no', default no")
