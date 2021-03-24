@@ -145,7 +145,10 @@ def _normalize_signals(signals, normalize_method="mad"):
         sshift, sscale = np.median(signals), np.float(robust.mad(signals))
     else:
         raise ValueError("")
-    norm_signals = (signals - sshift) / sscale
+    if sscale == 0.0:
+        norm_signals = signals
+    else:
+        norm_signals = (signals - sshift) / sscale
     return np.around(norm_signals, decimals=6)
 
 
