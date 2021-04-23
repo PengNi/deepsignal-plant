@@ -85,7 +85,7 @@ The example data can be downloaded from [google drive](https://drive.google.com/
 
 
 ## Quick start
-To call modifications, the raw fast5 files should be basecalled ([Guppy>=3.6.1](https://nanoporetech.com/community)) and then be re-squiggled by [tombo](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. The following are commands to call 5mC in CG, CHG, and CHH contexts as follows:
+To call modifications, the raw fast5 files should be basecalled ([Guppy>=3.6.1](https://nanoporetech.com/community)) and then be re-squiggled by [tombo](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. Belows are commands to call 5mC in CG, CHG, and CHH contexts:
 ```bash
 # Download and unzip the example data and pre-trained models.
 # 1. guppy basecall using GPU
