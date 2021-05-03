@@ -497,6 +497,7 @@ class SharedCounter(object):
         return self.count.value
 
 
+# https://github.com/vterron/lemon/commit/9ca6b4b1212228dbd4f69b88aaf88b12952d7d6f
 class Queue(multiprocessing.queues.Queue):
     """ A portable implementation of multiprocessing.Queue.
     Because of multithreading / multiprocessing semantics, Queue.qsize() may
