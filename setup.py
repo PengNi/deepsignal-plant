@@ -58,11 +58,13 @@ setup(
     license='GNU General Public License v3 (GPLv3)',
     author='Peng Ni',
     # tests_require=['pytest'],
+    # which package needs 'future' package?
+    # TODO: make requires as reading requirements.txt
     install_requires=['numpy>=1.15.3',
                       'h5py>=2.8.0',
                       'statsmodels>=0.9.0',
                       'scikit-learn>=0.20.1',
-                      'torch>=1.2.0,<=1.5',
+                      'torch>=1.2.0,<=1.6.0',
                       ],
     # cmdclass={'test': PyTest},
     author_email='543943952@qq.com',

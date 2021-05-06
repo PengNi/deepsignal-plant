@@ -207,6 +207,7 @@ def _get_signals_rect(signals_list, signals_len=16):
     return signals_rect
 
 
+# https://github.com/nanoporetech/ont_fast5_api/blob/master/ont_fast5_api/fast5_read.py#L523
 def _get_scaling_of_a_read(fast5fp):
     global_key = "UniqueGlobalKey/"
     try:
