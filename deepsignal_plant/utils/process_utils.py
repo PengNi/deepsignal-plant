@@ -399,27 +399,34 @@ def _get_kmer2lines(feafile):
 
 # for balancing kmer distri in training samples ===
 def _rand_select_by_kmer_ratio(kmer2lines, kmer2ratios, totalline):
+    inter_kmers = set(kmer2lines.keys()).intersection(set(kmer2ratios.keys()))
+    line_kmer_diff = set(kmer2lines.keys()).difference(set(kmer2ratios.keys()))
+    ratio_kmer_diff = set(kmer2ratios.keys()).difference(set(kmer2lines.keys()))
+    print("comm kmers: {}, line_kmers_diff: {}, ratio_kmers_diff: {}".format(len(inter_kmers),
+                                                                             len(line_kmer_diff),
+                                                                             len(ratio_kmer_diff)))
     selected_lines = []
-    unratioed_kmers = set()
+    unratioed_kmers = line_kmer_diff
     cnts = 0
-    for kmer in kmer2lines.keys():
-        if kmer in kmer2ratios.keys():
-            linenum = int(math.ceil(totalline * kmer2ratios[kmer]))
-            lines = kmer2lines[kmer]
-            if len(lines) <= linenum:
-                selected_lines += lines
-                cnts += (linenum - len(lines))
-            else:
-                selected_lines += random.sample(lines, linenum)
+    for kmer in inter_kmers:
+        linenum = int(math.ceil(totalline * kmer2ratios[kmer]))
+        lines = kmer2lines[kmer]
+        if len(lines) <= linenum:
+            selected_lines += lines
+            cnts += (linenum - len(lines))
         else:
-            unratioed_kmers.add(kmer)
+            selected_lines += random.sample(lines, linenum)
     print("for {} common kmers, fill {} samples, "
-          "{} samples that can't filled".format(len(kmer2lines.keys()) - len(unratioed_kmers),
-                                                len(selected_lines),
-                                                cnts))
+          "{} samples that can't be filled".format(len(inter_kmers),
+                                                   len(selected_lines),
+                                                   cnts))
+    print("for {} ratio_diff kmers, "
+          "{} samples that cant't be filled".format(len(ratio_kmer_diff),
+                                                    sum([round(totalline * kmer2ratios[kmer])
+                                                         for kmer in ratio_kmer_diff])))
     unfilled_cnt = totalline - len(selected_lines)
     print("totalline: {}, need to fill: {}".format(totalline, unfilled_cnt))
-    if len(unratioed_kmers) > 0:
+    if unfilled_cnt > 0 and len(unratioed_kmers) > 0:
         minlinenum = int(math.ceil(float(unfilled_cnt)/len(unratioed_kmers)))
         cnts = 0
         for kmer in unratioed_kmers:
@@ -430,7 +437,7 @@ def _rand_select_by_kmer_ratio(kmer2lines, kmer2ratios, totalline):
             else:
                 selected_lines += random.sample(lines, minlinenum)
                 cnts += minlinenum
-        print("extract {} samples from {} diff kmers".format(cnts, len(unratioed_kmers)))
+        print("extract {} samples from {} line_diff kmers".format(cnts, len(unratioed_kmers)))
     selected_lines = sorted(selected_lines)
     selected_lines = [-1] + selected_lines
     return selected_lines
@@ -455,7 +462,7 @@ def select_negsamples_asposkmer(pos_file, totalneg_file, seled_neg_file):
     kmer_count = _count_kmers_of_feafile(pos_file)
     kmer2ratio, totalline = _get_kmer2ratio_n_totalline(kmer_count)
 
-    print("{} kmers from kmer2ratio file:{}".format(len(kmer2ratio), pos_file))
+    print("{} kmers from kmer2ratio file: {}".format(len(kmer2ratio), pos_file))
     kmer2lines = _get_kmer2lines(totalneg_file)
     sel_lines = _rand_select_by_kmer_ratio(kmer2lines, kmer2ratio, totalline)
     _write_randsel_lines(totalneg_file, seled_neg_file, sel_lines)

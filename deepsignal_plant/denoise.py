@@ -238,9 +238,9 @@ def clean_samples(train_file, idx2logits, score_cf, is_filter_fn, ori_train_file
     left_ratio2 = float(len(neg_hc)) / len(idx2prob_neg) if len(idx2prob_neg) > 0 else 0
     print("{} ({}) high quality positive samples left, "
           "{} ({}) high quality negative samples left".format(len(pos_hc),
-                                                              left_ratio,
+                                                              round(left_ratio, 6),
                                                               len(neg_hc),
-                                                              left_ratio2))
+                                                              round(left_ratio2, 6)))
 
     # re-write train set
     fname, fext = os.path.splitext(train_file)
@@ -415,7 +415,7 @@ def main():
     parser.add_argument('--rounds', type=int, default=3, required=False)
     parser.add_argument("--score_cf", type=float, default=0.5,
                         required=False,
-                        help="score cutoff, usually <= 0.5")
+                        help="score cutoff, usually <= 0.5, default 0.5")
     parser.add_argument("--kept_ratio", type=float, default=0.99,
                         required=False,
                         help="kept ratio of samples, to end denoise process")

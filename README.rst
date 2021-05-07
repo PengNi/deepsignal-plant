@@ -9,7 +9,7 @@ Release
 -----
 change imports in ref_reader,
 change requirements,
-make 'kept_ratio' as a arg in denoise module
+fix and modify denoise module
 
 0.1.1
 -----

@@ -61,28 +61,28 @@ def main_train(args):
     from .train import train
     import time
 
-    print("[main]start..")
+    print("[main] start..")
     total_start = time.time()
 
     display_args(args)
     train(args)
 
     endtime = time.time()
-    print("[main]costs {} seconds".format(endtime - total_start))
+    print("[main] costs {} seconds".format(endtime - total_start))
 
 
 def main_denoise(args):
     from .denoise import denoise
     import time
 
-    print("[main]start..")
+    print("[main] start..")
     total_start = time.time()
 
     display_args(args)
     denoise(args)
 
     endtime = time.time()
-    print("[main]costs {} seconds".format(endtime - total_start))
+    print("[main] costs {} seconds".format(endtime - total_start))
 
 
 def main():
@@ -410,7 +410,7 @@ def main():
     sd_train.add_argument('--rounds', type=int, default=3, required=False)
     sd_train.add_argument("--score_cf", type=float, default=0.5,
                           required=False,
-                          help="score cutoff")
+                          help="score cutoff, usually <= 0.5, default 0.5")
     sd_train.add_argument("--kept_ratio", type=float, default=0.99,
                           required=False,
                           help="kept ratio of samples, to end denoise process")
