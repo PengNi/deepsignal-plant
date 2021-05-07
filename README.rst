@@ -5,6 +5,12 @@ deepsignal-plant
 Release
 -------
 
+0.1.2
+-----
+change imports in ref_reader,
+change requirements,
+make 'kept_ratio' as a arg in denoise module
+
 0.1.1
 -----
 fix bug and optimize call_mods without GPU, add call_freq funciton

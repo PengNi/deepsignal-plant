@@ -411,6 +411,9 @@ def main():
     sd_train.add_argument("--score_cf", type=float, default=0.5,
                           required=False,
                           help="score cutoff")
+    sd_train.add_argument("--kept_ratio", type=float, default=0.99,
+                          required=False,
+                          help="kept ratio of samples, to end denoise process")
     sd_train.add_argument('--pos_weight', type=float, default=1.0, required=False)
 
     sub_denoise.set_defaults(func=main_denoise)

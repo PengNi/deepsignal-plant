@@ -346,7 +346,7 @@ def denoise(args):
         os.remove(train_clean_pos_file)
         print("#####concat denoied file, finished!#####")
 
-        if left_ratio >= 0.99 or pos_num == 0:
+        if left_ratio >= args.kept_ratio or pos_num == 0:
             break
 
     os.remove(train_neg_file)
@@ -415,7 +415,10 @@ def main():
     parser.add_argument('--rounds', type=int, default=3, required=False)
     parser.add_argument("--score_cf", type=float, default=0.5,
                         required=False,
-                        help="score cutoff")
+                        help="score cutoff, usually <= 0.5")
+    parser.add_argument("--kept_ratio", type=float, default=0.99,
+                        required=False,
+                        help="kept ratio of samples, to end denoise process")
 
     parser.add_argument('--pos_weight', type=float, default=1.0, required=False)
 
