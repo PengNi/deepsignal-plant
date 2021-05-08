@@ -226,12 +226,12 @@ def clean_samples(train_file, idx2logits, score_cf, is_filter_fn, ori_train_file
 
     idx2prob_pos = sorted(idx2prob_pos, key=lambda x: x[1], reverse=True)
     for idx2prob in idx2prob_pos:
-        if idx2prob[1] > score_cf:
+        if idx2prob[1] >= score_cf:
             pos_hc.add(idx2prob[0])
     if is_filter_fn:
         idx2prob_neg = sorted(idx2prob_neg, key=lambda x: x[1])
         for idx2prob in idx2prob_neg:
-            if idx2prob[1] < score_cf:
+            if idx2prob[1] < 1 - score_cf:
                 neg_hc.add(idx2prob[0])
 
     left_ratio = float(len(pos_hc)) / len(idx2prob_pos) if len(idx2prob_pos) > 0 else 0
@@ -292,6 +292,13 @@ def _get_all_negative_samples(train_file, modeltype_str):
     return train_neg_file
 
 
+def _output_linenumber2probs(wfile, idx2logits):
+    wf = open(wfile, "w")
+    for idx in sorted(list(idx2logits.keys())):
+        wf.write("\t".join([str(idx), str(np.mean(idx2logits[idx]))]) + "\n")
+    wf.close()
+
+
 def denoise(args):
     total_start = time.time()
 
@@ -308,6 +315,11 @@ def denoise(args):
         # cross rank
         iterstr = str(iter_c + 1)
         idxs2logtis_all = train_rounds(train_file, iterstr, args, modeltype_str)
+
+        # output probs of 1 iteration
+        if iter_c == 0 and args.fst_iter_prob:
+            wfile = train_file + ".probs_1stiter.txt"
+            _output_linenumber2probs(wfile, idxs2logtis_all)
 
         is_filter_fn = str2bool(args.is_filter_fn)
         train_clean_pos_file, left_ratio, train_clean_neg_file = clean_samples(train_file, idxs2logtis_all,
@@ -407,20 +419,23 @@ def main():
                         help="BiLSTM hidden_size for combined feature")
 
     # model training
+    parser.add_argument('--pos_weight', type=float, default=1.0, required=False)
     parser.add_argument('--batch_size', type=int, default=512, required=False)
     parser.add_argument('--lr', type=float, default=0.001, required=False)
     parser.add_argument('--epoch_num', type=int, default=3, required=False)
     parser.add_argument('--step_interval', type=int, default=100, required=False)
+
     parser.add_argument('--iterations', type=int, default=10, required=False)
     parser.add_argument('--rounds', type=int, default=3, required=False)
     parser.add_argument("--score_cf", type=float, default=0.5,
                         required=False,
-                        help="score cutoff, usually <= 0.5, default 0.5")
+                        help="score cutoff to keep high quality (which prob>=score_cf) positive samples. "
+                             "usually <= 0.5, default 0.5")
     parser.add_argument("--kept_ratio", type=float, default=0.99,
                         required=False,
                         help="kept ratio of samples, to end denoise process")
-
-    parser.add_argument('--pos_weight', type=float, default=1.0, required=False)
+    parser.add_argument("--fst_iter_prob", action="store_true", default=False,
+                        help="if output probs of samples after 1st iteration")
 
     args = parser.parse_args()
 

@@ -402,19 +402,24 @@ def main():
     sd_train.add_argument('--hid_rnn', type=int, default=256, required=False,
                           help="BiLSTM hidden_size for combined feature")
     # model training
+    sd_train.add_argument('--pos_weight', type=float, default=1.0, required=False)
     sd_train.add_argument('--batch_size', type=int, default=512, required=False)
     sd_train.add_argument('--lr', type=float, default=0.001, required=False)
     sd_train.add_argument('--epoch_num', type=int, default=3, required=False)
     sd_train.add_argument('--step_interval', type=int, default=100, required=False)
-    sd_train.add_argument('--iterations', type=int, default=10, required=False)
-    sd_train.add_argument('--rounds', type=int, default=3, required=False)
-    sd_train.add_argument("--score_cf", type=float, default=0.5,
-                          required=False,
-                          help="score cutoff, usually <= 0.5, default 0.5")
-    sd_train.add_argument("--kept_ratio", type=float, default=0.99,
-                          required=False,
-                          help="kept ratio of samples, to end denoise process")
-    sd_train.add_argument('--pos_weight', type=float, default=1.0, required=False)
+
+    sd_denoise = sub_denoise.add_argument_group("DENOISE")
+    sd_denoise.add_argument('--iterations', type=int, default=10, required=False)
+    sd_denoise.add_argument('--rounds', type=int, default=3, required=False)
+    sd_denoise.add_argument("--score_cf", type=float, default=0.5,
+                            required=False,
+                            help="score cutoff to keep high quality (which prob>=score_cf) positive samples. "
+                                 "usually <= 0.5, default 0.5")
+    sd_denoise.add_argument("--kept_ratio", type=float, default=0.99,
+                            required=False,
+                            help="kept ratio of samples, to end denoise process")
+    sd_denoise.add_argument("--fst_iter_prob", action="store_true", default=False,
+                            help="if output probs of samples after 1st iteration")
 
     sub_denoise.set_defaults(func=main_denoise)
 
