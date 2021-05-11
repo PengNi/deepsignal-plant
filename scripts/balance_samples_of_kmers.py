@@ -2,6 +2,8 @@ import random
 import math
 import argparse
 
+kmer_colidx = 6
+
 
 # same as functions in deepsignal_plant/utils/process_utils.py ==========================
 # for balancing kmer distri in training samples ===
@@ -11,7 +13,7 @@ def _count_kmers_of_feafile(feafile):
     with open(feafile, "r") as rf:
         for line in rf:
             words = line.strip().split("\t")
-            kmer = words[6]
+            kmer = words[kmer_colidx]
             if kmer not in kmers:
                 kmers.add(kmer)
                 kmer_count[kmer] = 0
@@ -36,7 +38,7 @@ def _get_kmer2lines(feafile):
         lcnt = 0
         for line in rf:
             words = line.strip().split("\t")
-            kmer = words[6]
+            kmer = words[kmer_colidx]
             if kmer not in kmers:
                 kmers.add(kmer)
                 kmer2lines[kmer] = []

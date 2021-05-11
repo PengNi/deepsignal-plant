@@ -128,11 +128,18 @@ def _call_mods(features_batch, model, batch_size):
                 prob_0, prob_1 = logits[idx][0], logits[idx][1]
                 prob_0_norm = round(prob_0 / (prob_0 + prob_1), 6)
                 prob_1_norm = round(prob_1 / (prob_0 + prob_1), 6)
+
+                # kmer-5
+                b_idx_kmer = ''.join([code2base_dna[x] for x in b_kmers[idx]])
+                center_idx = int(np.floor(len(b_idx_kmer) / 2))
+                bkmer_start = center_idx - 2 if center_idx - 2 >= 0 else 0
+                bkmer_end = center_idx + 3 if center_idx + 3 <= len(b_idx_kmer) else len(b_idx_kmer)
+
                 pred_str.append("\t".join([b_sampleinfo[idx], str(prob_0_norm),
                                            str(prob_1_norm), str(predicted[idx]),
-                                           ''.join([code2base_dna[x] for x in b_kmers[idx]])]))
+                                           b_idx_kmer[bkmer_start:bkmer_end]]))
             batch_num += 1
-    accuracy = np.mean(accuracys)
+    accuracy = np.mean(accuracys) if len(accuracys) > 0 else 0
 
     return pred_str, accuracy, batch_num
 
@@ -485,6 +492,10 @@ def call_mods(args):
         os.remove(success_file)
 
     if os.path.isdir(input_path):
+        if args.reference_path is None:
+            raise ValueError("--reference_path is required to be set!")
+        if not os.path.exists(args.reference_path):
+            raise ValueError("--reference_path is not set right!")
         motif_seqs, chrom2len, fast5s_q, len_fast5s, positions = _extract_preprocess(input_path,
                                                                                      str2bool(args.recursively),
                                                                                      args.motifs,

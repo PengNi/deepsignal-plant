@@ -140,7 +140,7 @@ def train(args):
                             torch.save(model.state_dict(),
                                        model_dir + args.model_type + '.b{}_s{}_epoch{}.ckpt'.format(args.seq_len,
                                                                                                     args.signal_len,
-                                                                                                    epoch))
+                                                                                                    epoch + 1))
 
                     time_cost = time.time() - start
                     print('Epoch [{}/{}], Step [{}/{}], TrainLoss: {:.4f}; '
