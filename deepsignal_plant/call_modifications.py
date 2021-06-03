@@ -40,6 +40,8 @@ from .utils.constants_torch import use_cuda
 
 import uuid
 
+os.environ['MKL_THREADING_LAYER'] = 'GNU'
+
 queen_size_border = 2000
 queen_size_border_f5batch = 100
 time_wait = 3
@@ -478,7 +480,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
 
 
 def call_mods(args):
-    print("[main]call_mods starts..")
+    print("[main] call_mods starts..")
     start = time.time()
 
     model_path = os.path.abspath(args.model_path)
@@ -559,7 +561,7 @@ def call_mods(args):
 
     if os.path.exists(success_file):
         os.remove(success_file)
-    print("[main]call_mods costs %.2f seconds.." % (time.time() - start))
+    print("[main] call_mods costs %.2f seconds.." % (time.time() - start))
 
 
 def main():

@@ -52,6 +52,8 @@ def main_call_mods(args):
 
 
 def main_call_freq(args):
+    import os
+    os.environ['MKL_THREADING_LAYER'] = 'GNU'
     from .call_mods_freq import call_mods_frequency_to_file
     display_args(args)
     call_mods_frequency_to_file(args)

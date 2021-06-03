@@ -23,7 +23,7 @@ def train(args):
     total_start = time.time()
     # torch.manual_seed(args.seed)
 
-    print("[train]start..")
+    print("[train] start..")
     if use_cuda:
         print("GPU is available!")
     else:
@@ -164,7 +164,7 @@ def train(args):
 
     endtime = time.time()
     clear_linecache()
-    print("[train]training cost {} seconds".format(endtime - total_start))
+    print("[train] training cost {} seconds".format(endtime - total_start))
 
 
 def main():

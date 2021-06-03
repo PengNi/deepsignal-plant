@@ -449,7 +449,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      corrected_group, basecall_subgroup, normalize_method,
                      motifs, methyloc, kmer_len, signals_len, methy_label,
                      position_file, w_is_dir, w_batch_num):
-    print("[main]extract_features starts..")
+    print("[main] extract_features starts..")
     start = time.time()
 
     motif_seqs, chrom2len, fast5s_q, len_fast5s, positions = _extract_preprocess(fast5_dir, is_recursive,
@@ -498,8 +498,8 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
     p_w.join()
 
     print("%d of %d fast5 files failed..\n"
-          "[main]extract_features costs %.1f seconds.." % (errornum_sum, len_fast5s,
-                                                           time.time() - start))
+          "[main] extract_features costs %.1f seconds.." % (errornum_sum, len_fast5s,
+                                                            time.time() - start))
 
 
 def main():
