@@ -150,6 +150,33 @@ def get_fast5s(fast5_dir, is_recursive=True):
     return fast5s
 
 
+def parse_region_str(regionstr):
+    """
+    :param regionstr: chrom:start-end or chrom:start or chrom.
+     0-based, half-open region: [start, end)
+    :return: chrom, start, end
+    """
+    regionstr = regionstr.strip()
+    try:
+        if regionstr is None:
+            return None, None, None
+        elif ":" in regionstr:
+            regioncse = regionstr.split(":")
+            assert len(regioncse) == 2
+            chrom, se = regioncse[0], regioncse[1]
+            if "-" in se:
+                sne = se.split("-")
+                assert len(sne) == 2
+                s, e = int(sne[0]), int(sne[1])
+                return chrom, s, e
+            else:
+                return chrom, int(se), None
+        else:
+            return regionstr, None, None
+    except Exception:
+        raise ValueError("--region not set right!")
+
+
 # functions for combining files and random sampling lines of txt files ================
 def count_line_num(sl_filepath, fheader=False):
     count = 0

@@ -26,6 +26,8 @@ from .utils.process_utils import get_motif_seqs
 
 from .utils.ref_reader import get_contig2len
 
+from .utils.process_utils import parse_region_str
+
 reads_group = 'Raw/Reads'
 queen_size_border = 2000
 time_wait = 3
@@ -232,17 +234,23 @@ def _rescale_signals(rawsignals, scaling, offset):
 
 def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_method,
                       motif_seqs, methyloc, chrom2len, kmer_len, signals_len,
-                      methy_label, positions):
+                      methy_label, positions, regioninfo):
     features_list = []
     error = 0
+    rg_chrom, rg_start, rg_end = regioninfo
     for fast5_fp in fast5s:
         try:
+            readname, strand, alignstrand, chrom, \
+                chrom_start = _get_alignment_info_from_fast5(fast5_fp, corrected_group, basecall_subgroup)
+
+            # skip region of no-interest
+            if rg_chrom is not None and rg_chrom != chrom:
+                continue
+
             raw_signal, events = _get_label_raw(fast5_fp, corrected_group, basecall_subgroup)
 
             scaling, offset = _get_scaling_of_a_read(fast5_fp)
-            if scaling is None:
-                continue
-            else:
+            if scaling is not None:
                 raw_signal = _rescale_signals(raw_signal, scaling, offset)
 
             norm_signals = _normalize_signals(raw_signal, normalize_method)
@@ -251,8 +259,13 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
                 genomeseq += str(e[2])
                 signal_list.append(norm_signals[e[0]:(e[0] + e[1])])
 
-            readname, strand, alignstrand, chrom, \
-                chrom_start = _get_alignment_info_from_fast5(fast5_fp, corrected_group, basecall_subgroup)
+            # skip region of no-interest
+            rg_start = chrom_start if rg_start is None else rg_start
+            rg_end = chrom_start + len(genomeseq) if rg_end is None else rg_end
+            if rg_start >= chrom_start + len(genomeseq):
+                continue
+            if rg_end <= chrom_start:
+                continue
 
             chromlen = chrom2len[chrom]
             if alignstrand == '+':
@@ -273,11 +286,14 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
                 if num_bases <= loc_in_read < len(genomeseq) - num_bases:
                     loc_in_ref = loc_in_read + chrom_start_in_alignstrand
 
-                    # cpgid = readname + chrom + alignstrand + str(cpgloc_in_ref) + strand
                     if alignstrand == '-':
                         pos = chromlen - 1 - loc_in_ref
                     else:
                         pos = loc_in_ref
+
+                    # skip region of no-interest
+                    if pos < rg_start or pos >= rg_end:
+                        continue
 
                     if (positions is not None) and (key_sep.join([chrom, str(pos), alignstrand]) not in positions):
                         continue
@@ -332,7 +348,7 @@ def _fill_files_queue(fast5s_q, fast5_files, batch_size):
 def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
                              corrected_group, basecall_subgroup, normalize_method,
                              motif_seqs, methyloc, chrom2len, kmer_len, signals_len, methy_label,
-                             positions):
+                             positions, regioninfo):
     f5_num = 0
     while True:
         if fast5s_q.empty():
@@ -345,7 +361,7 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
         features_list, error_num = _extract_features(fast5s, corrected_group, basecall_subgroup,
                                                      normalize_method, motif_seqs, methyloc,
                                                      chrom2len, kmer_len, signals_len, methy_label,
-                                                     positions)
+                                                     positions, regioninfo)
         features_str = []
         for features in features_list:
             features_str.append(_features_to_str(features))
@@ -421,7 +437,7 @@ def _read_position_file(position_file):
 
 
 def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path, f5_batch_num,
-                        position_file):
+                        position_file, regionstr):
 
     fast5_files = get_fast5s(fast5_dir, is_recursive)
     print("{} fast5 files in total..".format(len(fast5_files)))
@@ -432,29 +448,35 @@ def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path,
     print("read genome reference file..")
     chrom2len = get_contig2len(reference_path)
 
-    print("read position file if it is not None..")
+    print("read position file: {}".format(position_file))
     positions = None
     if position_file is not None:
         positions = _read_position_file(position_file)
+
+    regioninfo = parse_region_str(regionstr)
+    chrom, start, end = regioninfo
+    print("parse region of interest: {}, [{}, {})".format(chrom, start, end))
 
     # fast5s_q = mp.Queue()
     fast5s_q = Queue()
     _fill_files_queue(fast5s_q, fast5_files, f5_batch_num)
 
-    return motif_seqs, chrom2len, fast5s_q, len(fast5_files), positions
+    return motif_seqs, chrom2len, fast5s_q, len(fast5_files), positions, regioninfo
 
 
 def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      batch_size, write_fp, nproc,
                      corrected_group, basecall_subgroup, normalize_method,
                      motifs, methyloc, kmer_len, signals_len, methy_label,
-                     position_file, w_is_dir, w_batch_num):
+                     position_file, regionstr, w_is_dir, w_batch_num):
     print("[main] extract_features starts..")
     start = time.time()
 
-    motif_seqs, chrom2len, fast5s_q, len_fast5s, positions = _extract_preprocess(fast5_dir, is_recursive,
-                                                                                 motifs, is_dna, reference_path,
-                                                                                 batch_size, position_file)
+    motif_seqs, chrom2len, fast5s_q, len_fast5s, \
+        positions, regioninfo = _extract_preprocess(fast5_dir, is_recursive,
+                                                    motifs, is_dna, reference_path,
+                                                    batch_size, position_file,
+                                                    regionstr)
 
     # featurestr_q = mp.Queue()
     # errornum_q = mp.Queue()
@@ -470,7 +492,7 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                                                               corrected_group, basecall_subgroup,
                                                               normalize_method, motif_seqs,
                                                               methyloc, chrom2len, kmer_len, signals_len,
-                                                              methy_label, positions))
+                                                              methy_label, positions, regioninfo))
         p.daemon = True
         p.start()
         featurestr_procs.append(p)
@@ -558,10 +580,11 @@ def main():
                                     'the same')
     ep_extraction.add_argument("--mod_loc", action="store", type=int, required=False, default=0,
                                help='0-based location of the targeted base in the motif, default 0')
-    # ep_extraction.add_argument("--region", action="store", type=str,
-    #                            required=False, default=None,
-    #                            help="region of interest, e.g.: chr1:0-10000, default None, "
-    #                                 "for the whole region")
+    ep_extraction.add_argument("--region", action="store", type=str,
+                               required=False, default=None,
+                               help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
+                                    "0-based, half-open interval: [start, end). "
+                                    "default None, means processing the whole sites in genome")
     ep_extraction.add_argument("--positions", action="store", type=str,
                                required=False, default=None,
                                help="file with a list of positions interested (must be formatted as tab-separated file"
@@ -609,6 +632,7 @@ def main():
     mod_loc = extraction_args.mod_loc
     methy_label = extraction_args.methy_label
     position_file = extraction_args.positions
+    regionstr = extraction_args.region
 
     nproc = extraction_args.nproc
     f5_batch_size = extraction_args.f5_batch_size
@@ -616,7 +640,7 @@ def main():
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
                      normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
-                     position_file, w_is_dir, w_batch_num)
+                     position_file, regionstr, w_is_dir, w_batch_num)
 
 
 if __name__ == '__main__':

@@ -430,10 +430,10 @@ def main():
     parser.add_argument("--score_cf", type=float, default=0.5,
                         required=False,
                         help="score cutoff to keep high quality (which prob>=score_cf) positive samples. "
-                             "usually <= 0.5, default 0.5")
+                             "(0, 0.5], default 0.5")
     parser.add_argument("--kept_ratio", type=float, default=0.99,
                         required=False,
-                        help="kept ratio of samples, to end denoise process")
+                        help="kept ratio of samples, to end denoise process. default 0.99")
     parser.add_argument("--fst_iter_prob", action="store_true", default=False,
                         help="if output probs of samples after 1st iteration")
 

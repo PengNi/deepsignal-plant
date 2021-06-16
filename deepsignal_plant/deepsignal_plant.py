@@ -34,6 +34,7 @@ def main_extraction(args):
     mod_loc = args.mod_loc
     methy_label = args.methy_label
     position_file = args.positions
+    regionstr = args.region
 
     nproc = args.nproc
     f5_batch_size = args.f5_batch_size
@@ -41,7 +42,7 @@ def main_extraction(args):
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
                      normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
-                     position_file, w_is_dir, w_batch_num)
+                     position_file, regionstr, w_is_dir, w_batch_num)
 
 
 def main_call_mods(args):
@@ -172,10 +173,11 @@ def main():
                                     'the same')
     se_extraction.add_argument("--mod_loc", action="store", type=int, required=False, default=0,
                                help='0-based location of the targeted base in the motif, default 0')
-    # se_extraction.add_argument("--region", action="store", type=str,
-    #                            required=False, default=None,
-    #                            help="region of interest, e.g.: chr1:0-10000, default None, "
-    #                                 "for the whole region")
+    se_extraction.add_argument("--region", action="store", type=str,
+                               required=False, default=None,
+                               help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
+                                    "0-based, half-open interval: [start, end). "
+                                    "default None, means processing the whole sites in genome")
     se_extraction.add_argument("--positions", action="store", type=str,
                                required=False, default=None,
                                help="file with a list of positions interested (must be formatted as tab-separated file"
@@ -294,6 +296,11 @@ def main():
     sc_f5.add_argument("--f5_batch_size", action="store", type=int, default=20,
                        required=False,
                        help="number of files to be processed by each process one time, default 20")
+    sc_f5.add_argument("--region", action="store", type=str,
+                       required=False, default=None,
+                       help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
+                            "0-based, half-open interval: [start, end). "
+                            "default None, means processing the whole sites in genome")
     sc_f5.add_argument("--positions", action="store", type=str,
                        required=False, default=None,
                        help="file with a list of positions interested (must be formatted as tab-separated file"
@@ -416,10 +423,10 @@ def main():
     sd_denoise.add_argument("--score_cf", type=float, default=0.5,
                             required=False,
                             help="score cutoff to keep high quality (which prob>=score_cf) positive samples. "
-                                 "usually <= 0.5, default 0.5")
+                                 "(0, 0.5], default 0.5")
     sd_denoise.add_argument("--kept_ratio", type=float, default=0.99,
                             required=False,
-                            help="kept ratio of samples, to end denoise process")
+                            help="kept ratio of samples, to end denoise process. default 0.99")
     sd_denoise.add_argument("--fst_iter_prob", action="store_true", default=False,
                             help="if output probs of samples after 1st iteration")
 

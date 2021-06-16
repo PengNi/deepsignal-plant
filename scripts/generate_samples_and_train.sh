@@ -23,8 +23,8 @@ CUDA_VISIBLE_DEVICES=0 deepsignal_plant denoise --train_file samples_CHG.hc_pose
 
 # 6. split samples for training/validating
 # suppose file "samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv" has 16000000 lines (samples), and we use 100k samples for validation
-head -15900000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.train.tsv
-tail -100000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.valid.tsv
+head -15840000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.train.tsv
+tail -160000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.valid.tsv
 
 # 7. train
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant train --train_file samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.train.tsv --valid_file samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.valid.tsv --model_dir model.dplant.CHG --step_interval 1000

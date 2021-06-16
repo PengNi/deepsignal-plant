@@ -210,11 +210,11 @@ def _write_predstr_to_file(write_fp, predstr_q):
             wf.flush()
 
 
-def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, args):
+def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioninfo, args):
     features_list, error = _extract_features(fast5s, args.corrected_group, args.basecall_subgroup,
                                              args.normalize_method, motif_seqs, args.mod_loc, chrom2len,
                                              args.seq_len, args.signal_len,
-                                             args.methy_label, positions)
+                                             args.methy_label, positions, regioninfo)
     features_batches = []
 
     sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
@@ -241,7 +241,8 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, args):
 
 
 def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
-                            motif_seqs, chrom2len, positions, args):
+                            motif_seqs, chrom2len, positions, regioninfo,
+                            args):
     print("read_fast5 process-{} starts".format(os.getpid()))
     f5_num = 0
     while True:
@@ -252,7 +253,7 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
             fast5s_q.put("kill")
             break
         f5_num += len(fast5s)
-        features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
+        features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioninfo,
                                                              args)
         errornum_q.put(error)
         for features_batch in features_batches:
@@ -262,7 +263,7 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
     print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
-def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions,
+def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo,
                                model_path, success_file,
                                args):
     # features_batch_q = mp.Queue()
@@ -285,7 +286,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     features_batch_procs = []
     for _ in range(nproc - nproc_gpu - 1):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
-                                                             motif_seqs, chrom2len, positions,
+                                                             motif_seqs, chrom2len, positions, regioninfo,
                                                              args))
         p.daemon = True
         p.start()
@@ -327,7 +328,8 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
 
 
-def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo,
+                                model_path,
                                 success_file, args):
     # features_batch_q = mp.Queue()
     # errornum_q = mp.Queue()
@@ -346,7 +348,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
     features_batch_procs = []
     for _ in range(nproc - nproc_call_mods - 1):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
-                                                             motif_seqs, chrom2len, positions,
+                                                             motif_seqs, chrom2len, positions, regioninfo,
                                                              args))
         p.daemon = True
         p.start()
@@ -498,18 +500,22 @@ def call_mods(args):
             raise ValueError("--reference_path is required to be set!")
         if not os.path.exists(args.reference_path):
             raise ValueError("--reference_path is not set right!")
-        motif_seqs, chrom2len, fast5s_q, len_fast5s, positions = _extract_preprocess(input_path,
-                                                                                     str2bool(args.recursively),
-                                                                                     args.motifs,
-                                                                                     str2bool(args.is_dna),
-                                                                                     args.reference_path,
-                                                                                     args.f5_batch_size,
-                                                                                     args.positions)
+        motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, \
+            regioninfo = _extract_preprocess(input_path,
+                                             str2bool(args.recursively),
+                                             args.motifs,
+                                             str2bool(args.is_dna),
+                                             args.reference_path,
+                                             args.f5_batch_size,
+                                             args.positions,
+                                             args.region)
         if use_cuda:
-            _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+            _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo,
+                                       model_path,
                                        success_file, args)
         else:
-            _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
+            _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo,
+                                        model_path,
                                         success_file, args)
     else:
         # features_batch_q = mp.Queue()
@@ -657,6 +663,11 @@ def main():
     p_f5.add_argument("--f5_batch_size", action="store", type=int, default=20,
                       required=False,
                       help="number of files to be processed by each process one time, default 20")
+    p_f5.add_argument("--region", action="store", type=str,
+                      required=False, default=None,
+                      help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
+                           "0-based, half-open interval: [start, end). "
+                           "default None, means processing the whole sites in genome")
     p_f5.add_argument("--positions", action="store", type=str,
                       required=False, default=None,
                       help="file with a list of positions interested (must be formatted as tab-separated file"
