@@ -260,11 +260,9 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
                 signal_list.append(norm_signals[e[0]:(e[0] + e[1])])
 
             # skip region of no-interest
-            rg_start = chrom_start if rg_start is None else rg_start
-            rg_end = chrom_start + len(genomeseq) if rg_end is None else rg_end
-            if rg_start >= chrom_start + len(genomeseq):
-                continue
-            if rg_end <= chrom_start:
+            read_rg_start = chrom_start if rg_start is None else rg_start
+            read_rg_end = chrom_start + len(genomeseq) if rg_end is None else rg_end
+            if read_rg_start >= chrom_start + len(genomeseq) or read_rg_end <= chrom_start:
                 continue
 
             chromlen = chrom2len[chrom]
@@ -292,7 +290,7 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
                         pos = loc_in_ref
 
                     # skip region of no-interest
-                    if pos < rg_start or pos >= rg_end:
+                    if (rg_chrom is not None) and (pos < read_rg_start or pos >= read_rg_end):
                         continue
 
                     if (positions is not None) and (key_sep.join([chrom, str(pos), alignstrand]) not in positions):
