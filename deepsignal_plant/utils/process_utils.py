@@ -156,12 +156,11 @@ def parse_region_str(regionstr):
      0-based, half-open region: [start, end)
     :return: chrom, start, end
     """
-    regionstr = regionstr.strip()
     try:
         if regionstr is None:
             return None, None, None
         elif ":" in regionstr:
-            regioncse = regionstr.split(":")
+            regioncse = regionstr.strip().split(":")
             assert len(regioncse) == 2
             chrom, se = regioncse[0], regioncse[1]
             if "-" in se:
@@ -172,7 +171,7 @@ def parse_region_str(regionstr):
             else:
                 return chrom, int(se), None
         else:
-            return regionstr, None, None
+            return regionstr.strip(), None, None
     except Exception:
         raise ValueError("--region not set right!")
 
