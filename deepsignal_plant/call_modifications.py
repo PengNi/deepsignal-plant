@@ -660,9 +660,9 @@ def main():
                            'the same')
     p_f5.add_argument("--mod_loc", action="store", type=int, required=False, default=0,
                       help='0-based location of the targeted base in the motif, default 0')
-    p_f5.add_argument("--f5_batch_size", action="store", type=int, default=20,
+    p_f5.add_argument("--f5_batch_size", action="store", type=int, default=10,
                       required=False,
-                      help="number of files to be processed by each process one time, default 20")
+                      help="number of files to be processed by each process one time, default 10")
     p_f5.add_argument("--region", action="store", type=str,
                       required=False, default=None,
                       help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "

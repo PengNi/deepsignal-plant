@@ -606,9 +606,9 @@ def main():
     extraction_parser.add_argument("--nproc", "-p", action="store", type=int, default=1,
                                    required=False,
                                    help="number of processes to be used, default 1")
-    extraction_parser.add_argument("--f5_batch_size", action="store", type=int, default=100,
+    extraction_parser.add_argument("--f5_batch_size", action="store", type=int, default=20,
                                    required=False,
-                                   help="number of files to be processed by each process one time, default 100")
+                                   help="number of files to be processed by each process one time, default 20")
 
     extraction_args = extraction_parser.parse_args()
     display_args(extraction_args)

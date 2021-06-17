@@ -22,7 +22,7 @@ python /path/to/scripts/concat_two_files.py --fp1 samples_CHG.hc_poses_positive.
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant denoise --train_file samples_CHG.hc_poses.rb20m.tsv --is_filter_fn no/yes [--model_type --epoch_num --rounds --iterations]
 
 # 6. split samples for training/validating
-# suppose file "samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv" has 16000000 lines (samples), and we use 100k samples for validation
+# suppose file "samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv" has 16000000 lines (samples), and we use 160k samples for validation
 head -15840000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.train.tsv
 tail -160000 samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.tsv > samples_CHG.hc_poses.rb20m.*_bilstm.denoise_*.valid.tsv
 
