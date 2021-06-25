@@ -219,8 +219,6 @@ The modification_frequency file can be either saved in [bedMethyl](https://www.e
 deepsignal_plant denoise --train_file /path/to/train/file
 ```
 
-Check [script/generate_samples_and_train.sh](https://github.com/PengNi/deepsignal-plant/blob/master/scripts/generate_samples_and_train.sh) for more details.
-
 #### 6. train new models
 A new model can be trained as follows:
 ```bash
@@ -228,8 +226,6 @@ A new model can be trained as follows:
 # please use deepsignal_plant train -h/--help for instructions
 deepsignal_plant train --train_file /path/to/train/file --valid_file /path/to/valid/file --model_dir /dir/to/save/the/new/model
 ```
-
-Check [script/generate_samples_and_train.sh](https://github.com/PengNi/deepsignal-plant/blob/master/scripts/generate_samples_and_train.sh) for more details.
 
 
 License
