@@ -73,9 +73,9 @@ pip install ont-tombo
 
 Currently we have trained the following models:
    * _[model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt](https://drive.google.com/file/d/1HnDKPEfCAXgo7vPN-zaD44Kqz1SDw160/view?usp=sharing)_: A 5mC model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * (deprecated) ~~_[model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt](https://drive.google.com/file/d/1BRThGKdRS6cCRXomJ0sGK2vXCFtWbhv7/view?usp=sharing)_: A CpG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
-   * (deprecated) ~~_[model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt](https://drive.google.com/file/d/1mRWIWVvoHnktKzvatvuH59Wg8TFTNSac/view?usp=sharing)_: A CHG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
-   * (deprecated) ~~_[model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt](https://drive.google.com/file/d/1CiIEzhoJvN2OUy4vTfDSe6c2ig6d0j8w/view?usp=sharing)_: A CHH (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
+   * (deprecated) _[model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt](https://drive.google.com/file/d/1BRThGKdRS6cCRXomJ0sGK2vXCFtWbhv7/view?usp=sharing)_: A CpG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * (deprecated) _[model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt](https://drive.google.com/file/d/1mRWIWVvoHnktKzvatvuH59Wg8TFTNSac/view?usp=sharing)_: A CHG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * (deprecated) _[model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt](https://drive.google.com/file/d/1CiIEzhoJvN2OUy4vTfDSe6c2ig6d0j8w/view?usp=sharing)_: A CHH (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
 
 
 ## Example data
@@ -100,7 +100,7 @@ tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --c
 # C
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
 deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
-# split freq file into 3 call_freq files as motif (CG/CHG/CHH)
+# split 5mC call_freq file into CG/CHG/CHH call_freq files
 python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqfile fast5s.C.call_mods.frequency.tsv &
 ```
 
@@ -162,8 +162,10 @@ For the example data:
 ```bash
 # call 5mCs for instance
 
-# extracted-feature file as input
-deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30 --nproc_gpu 6
+# extracted-feature file as input, use CPU
+CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30
+# extracted-feature file as input, use GPU
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30 --nproc_gpu 6
 
 # fast5 files as input, use CPU
 CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30
