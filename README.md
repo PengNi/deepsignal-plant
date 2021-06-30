@@ -101,7 +101,7 @@ tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --c
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
 deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
 # split 5mC call_freq file into CG/CHG/CHH call_freq files
-python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqfile fast5s.C.call_mods.frequency.tsv &
+python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqfile fast5s.C.call_mods.frequency.tsv
 ```
 
 
@@ -137,7 +137,7 @@ Features of targeted sites can be extracted for training or testing.
 For the example data (By default, deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
 ```bash
 # extract features of all Cs
-deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 --nproc 30 --motifs C &
+deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 --nproc 30 --motifs C
 ```
 
 The extracted_features file is a tab-delimited text file in the following format:
