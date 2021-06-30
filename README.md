@@ -70,18 +70,17 @@ pip install ont-tombo
 
 
 ## Trained models
-The models we trained can be downloaded from [google drive](https://drive.google.com/drive/folders/1BJ3OTFQhGXc20KdKx9QExCvO1st96-zO?usp=sharing).
 
 Currently we have trained the following models:
-   * _model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt_: A CpG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * _model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt_: A CHG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * _model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt_: A CHH (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * _[model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt](https://drive.google.com/file/d/1HnDKPEfCAXgo7vPN-zaD44Kqz1SDw160/view?usp=sharing)_: A 5mC model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
+   * (deprecated) ~~_[model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt](https://drive.google.com/file/d/1BRThGKdRS6cCRXomJ0sGK2vXCFtWbhv7/view?usp=sharing)_: A CpG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
+   * (deprecated) ~~_[model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt](https://drive.google.com/file/d/1mRWIWVvoHnktKzvatvuH59Wg8TFTNSac/view?usp=sharing)_: A CHG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
+   * (deprecated) ~~_[model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt](https://drive.google.com/file/d/1CiIEzhoJvN2OUy4vTfDSe6c2ig6d0j8w/view?usp=sharing)_: A CHH (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.~~
 
 
 ## Example data
-The example data can be downloaded from [google drive](https://drive.google.com/drive/folders/1BJ3OTFQhGXc20KdKx9QExCvO1st96-zO?usp=sharing).
 
-   * _fast5s.sample.tar.gz_: 4000 _A. thaliana_ R9.4 raw reads, with a genome reference.
+   * _[fast5s.sample.tar.gz](https://drive.google.com/file/d/1PauSQH-3Wpi6FNjNycH9n3GSxkW8C3s0/view?usp=sharing)_: 4000 _A. thaliana_ R9.4 raw reads, with a genome reference.
 
 
 ## Quick start
@@ -97,16 +96,12 @@ tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ --fastq-filena
 tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --corrected-group RawGenomeCorrected_000 --basecall-group Basecall_1D_000 --overwrite
 
 # 3. deepsignal-plant call_mods
-# we call CG, CHG, CHH methylation separately
-# CG
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CG --nproc 30 --nproc_gpu 6
-deepsignal_plant call_freq --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
-# CHG
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt --result_file fast5s.CHG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CHG --nproc 30 --nproc_gpu 6
-deepsignal_plant call_freq --input_path fast5s.CHG.call_mods.tsv --result_file fast5s.CHG.call_mods.frequency.tsv
-# CHH
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt --result_file fast5s.CHH.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CHH --nproc 30 --nproc_gpu 6
-deepsignal_plant call_freq --input_path fast5s.CHH.call_mods.tsv --result_file fast5s.CHH.call_mods.frequency.tsv
+# 5mCs in all contexts (CG, CHG, and CHH) can be called at one time
+# C
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
+# split freq file into 3 call_freq files as motif (CG/CHG/CHH)
+python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqfile fast5s.C.call_mods.frequency.tsv &
 ```
 
 
@@ -139,9 +134,10 @@ tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --c
 #### 2. extract features
 Features of targeted sites can be extracted for training or testing.
 
-For the example data (deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads by default. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
+For the example data (By default, deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
 ```bash
-deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna -o fast5s.CG.features.tsv --corrected_group RawGenomeCorrected_000 --nproc 30 --motifs CG &
+# extract features of all Cs
+deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 --nproc 30 --motifs C &
 ```
 
 The extracted_features file is a tab-delimited text file in the following format:
@@ -164,15 +160,15 @@ To call modifications, either the extracted-feature file or **the raw fast5 file
 
 For the example data:
 ```bash
-# call 5mCpGs for instance
+# call 5mCs for instance
 
 # extracted-feature file as input
-deepsignal_plant call_mods --input_path fast5s.CG.features.tsv --model_path model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt --result_file fast5s.CG.call_mods.tsv --motifs CG --nproc 30 --nproc_gpu 6
+deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30 --nproc_gpu 6
 
 # fast5 files as input, use CPU
-CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CG --nproc 30
+CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30
 # fast5 files as input, use GPU
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt --result_file fast5s.CG.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs CG --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
 ```
 
 The modification_call file is a tab-delimited text file in the following format:
@@ -190,14 +186,14 @@ The modification_call file is a tab-delimited text file in the following format:
 #### 4. call frequency of modifications
 A modification-frequency file can be generated by `call_freq` function with the call_mods file as input:
 ```bash
-# call 5mCpGs for instance
+# call 5mCs for instance
 
 # output in tsv format
-deepsignal_plant call_freq --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.tsv
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
 # output in bedMethyl format
-deepsignal_plant call_freq --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.bed --bed
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.bed --bed
 # use --sort to sort the results
-deepsignal_plant call_freq --input_path fast5s.CG.call_mods.tsv --result_file fast5s.CG.call_mods.frequency.bed --bed --sort
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.bed --bed --sort
 ```
 
 The modification_frequency file can be either saved in [bedMethyl](https://www.encodeproject.org/data-standards/wgbs/) format (by setting `--bed` as above), or saved as a tab-delimited text file in the following format by default:

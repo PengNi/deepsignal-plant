@@ -16,7 +16,9 @@ fix and modify denoise module,
 
 fix MKL_THREADING_LAYER error temporarily,
 
-add `--region` option
+add `--region` option,
+
+a combined 5mC model replacing CG/CHG/CHH models
 
 
 
