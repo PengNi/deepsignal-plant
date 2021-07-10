@@ -12,6 +12,11 @@ def clear_linecache():
 
 
 def parse_a_line2(line):
+    """
+    parse features of a sample
+    :param line:
+    :return:
+    """
     words = line.strip().split("\t")
 
     sampleinfo = "\t".join(words[0:6])

@@ -16,6 +16,12 @@ from .utils.txt_formater import split_key
 
 
 def calculate_mods_frequency(mods_files, prob_cf):
+    """
+    call mod_freq from call_mods files
+    :param mods_files: a list of call_mods files
+    :param prob_cf:
+    :return:
+    """
     sitekeys = set()
     sitekey2stats = dict()
 
@@ -45,6 +51,14 @@ def calculate_mods_frequency(mods_files, prob_cf):
 
 
 def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
+    """
+    write methylfreq of sites into files
+    :param sitekey2stats:
+    :param result_file:
+    :param is_sort: sorted by poses
+    :param is_bed: in bed format or not
+    :return:
+    """
     if is_sort:
         keys = sorted(list(sitekey2stats.keys()), key=lambda x: split_key(x))
     else:

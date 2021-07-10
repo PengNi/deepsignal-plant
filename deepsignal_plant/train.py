@@ -20,6 +20,11 @@ from .utils.constants_torch import use_cuda
 
 
 def train(args):
+    """
+
+    :param args: train_sample_file, valid_sample_file, hyperparameters
+    :return: directory contains model_params_checkpoint_file
+    """
     total_start = time.time()
     # torch.manual_seed(args.seed)
 

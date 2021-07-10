@@ -37,6 +37,13 @@ key_sep = "||"
 
 
 def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
+    """
+    get mapped raw signals with sequence from fast file
+    :param fast5_fn: fast5 file path
+    :param correct_group: tombo resquiggle group
+    :param correct_subgroup: for template or complement
+    :return:
+    """
     try:
         fast5_data = h5py.File(fast5_fn, 'r')
     except IOError:
@@ -78,6 +85,12 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
 
 
 def _get_alignment_attrs_of_each_strand(strand_path, h5obj):
+    """
+
+    :param strand_path: template or complement
+    :param h5obj: h5py object
+    :return:
+    """
     strand_basecall_group_alignment = h5obj['/'.join([strand_path, 'Alignment'])]
     alignment_attrs = strand_basecall_group_alignment.attrs
     # attr_names = list(alignment_attrs.keys())
@@ -106,6 +119,11 @@ def _get_alignment_attrs_of_each_strand(strand_path, h5obj):
 
 
 def _get_readid_from_fast5(h5file):
+    """
+    get read id from a fast5 file h5py obj
+    :param h5file:
+    :return:
+    """
     first_read = list(h5file[reads_group].keys())[0]
     if sys.version_info[0] >= 3:
         try:
@@ -120,6 +138,13 @@ def _get_readid_from_fast5(h5file):
 
 def _get_alignment_info_from_fast5(fast5_path, corrected_group='RawGenomeCorrected_000',
                                    basecall_subgroup='BaseCalled_template'):
+    """
+    get alignment info (readid, strand (t/c), align strand, chrom, start) from fast5 files
+    :param fast5_path:
+    :param corrected_group:
+    :param basecall_subgroup:
+    :return:
+    """
     try:
         h5file = h5py.File(fast5_path, mode='r')
         corrgroup_path = '/'.join(['Analyses', corrected_group])
@@ -194,6 +219,12 @@ def _normalize_signals(signals, normalize_method="mad"):
 
 
 def _get_signals_rect(signals_list, signals_len=16):
+    """
+    signal features in matrix format
+    :param signals_list:
+    :param signals_len:
+    :return:
+    """
     signals_rect = []
     for signals_tmp in signals_list:
         signals = list(np.around(signals_tmp, decimals=6))
@@ -235,6 +266,22 @@ def _rescale_signals(rawsignals, scaling, offset):
 def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_method,
                       motif_seqs, methyloc, chrom2len, kmer_len, signals_len,
                       methy_label, positions, regioninfo):
+    """
+    extract sequence features and signal features from a group of fast5s, save in list
+    :param fast5s:
+    :param corrected_group:
+    :param basecall_subgroup:
+    :param normalize_method:
+    :param motif_seqs:
+    :param methyloc:
+    :param chrom2len:
+    :param kmer_len:
+    :param signals_len:
+    :param methy_label:
+    :param positions:
+    :param regioninfo:
+    :return:
+    """
     features_list = []
     error = 0
     rg_chrom, rg_start, rg_end = regioninfo
@@ -322,7 +369,7 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
 
 def _features_to_str(features):
     """
-
+    convert features to string for output
     :param features: a tuple
     :return:
     """
@@ -347,6 +394,24 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
                              corrected_group, basecall_subgroup, normalize_method,
                              motif_seqs, methyloc, chrom2len, kmer_len, signals_len, methy_label,
                              positions, regioninfo):
+    """
+    subprocess obj for feature extraction
+    :param fast5s_q:
+    :param featurestr_q:
+    :param errornum_q:
+    :param corrected_group:
+    :param basecall_subgroup:
+    :param normalize_method:
+    :param motif_seqs:
+    :param methyloc:
+    :param chrom2len:
+    :param kmer_len:
+    :param signals_len:
+    :param methy_label:
+    :param positions:
+    :param regioninfo:
+    :return:
+    """
     f5_num = 0
     while True:
         if fast5s_q.empty():
@@ -436,7 +501,18 @@ def _read_position_file(position_file):
 
 def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path, f5_batch_num,
                         position_file, regionstr):
-
+    """
+    prepare necessary information for feature extraction
+    :param fast5_dir:
+    :param is_recursive:
+    :param motifs:
+    :param is_dna:
+    :param reference_path:
+    :param f5_batch_num:
+    :param position_file:
+    :param regionstr:
+    :return:
+    """
     fast5_files = get_fast5s(fast5_dir, is_recursive)
     print("{} fast5 files in total..".format(len(fast5_files)))
 

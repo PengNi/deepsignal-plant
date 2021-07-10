@@ -26,6 +26,14 @@ from .utils.process_utils import get_model_type_str
 
 
 def train_1time(train_file, valid_file, valid_lidxs, args):
+    """
+    use train_file to train model, then score the probs of the samples in valid_file
+    :param train_file:
+    :param valid_file:
+    :param valid_lidxs:
+    :param args:
+    :return:
+    """
     # ===========
     train_dataset = SignalFeaData2(train_file)
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset,
@@ -163,6 +171,14 @@ def train_1time(train_file, valid_file, valid_lidxs, args):
 
 
 def train_rounds(train_file, iterstr, args, modeltype_str):
+    """
+    repeat rounds of splitting train_file to train_then_valid
+    :param train_file:
+    :param iterstr:
+    :param args:
+    :param modeltype_str:
+    :return:
+    """
     print("\n##########Train Cross Rank##########")
     total_num = count_line_num(train_file, False)
     half_num = total_num // 2
