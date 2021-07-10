@@ -84,6 +84,7 @@ def train(args):
     print("total_step: {}".format(total_step))
     curr_best_accuracy = 0
     model.train()
+    # train at most max_epoch_num epochs
     for epoch in range(args.max_epoch_num):
         curr_best_accuracy_epoch = 0
         tlosses = []

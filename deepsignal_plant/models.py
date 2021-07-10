@@ -176,6 +176,7 @@ class ModelBiLSTM(nn.Module):
 
     def forward(self, kmer, base_means, base_stds, base_signal_lens, signals):
         # seq feature ============================================
+        # kmer, base_means, base_stds, base_signal_lens
         if self.module != "signal_bilstm":
             base_means = torch.reshape(base_means, (-1, self.seq_len, 1)).float()
             base_stds = torch.reshape(base_stds, (-1, self.seq_len, 1)).float()
@@ -199,6 +200,7 @@ class ModelBiLSTM(nn.Module):
             out_seq = self.relu_seq(out_seq)
 
         # signal feature ==========================================
+        # sgianls (L*C)
         if self.module != "seq_bilstm":
             out_signal = signals.float()
             # resnet ---
