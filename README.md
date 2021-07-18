@@ -17,7 +17,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 - [Usage](#Usage)
 
 ## Installation
-deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
+deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [Guppy](https://nanoporetech.com/community) and [tombo](https://github.com/nanoporetech/tombo) are required to basecall and re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
