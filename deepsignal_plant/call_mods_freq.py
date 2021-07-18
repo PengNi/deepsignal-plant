@@ -20,7 +20,7 @@ def calculate_mods_frequency(mods_files, prob_cf):
     call mod_freq from call_mods files
     :param mods_files: a list of call_mods files
     :param prob_cf:
-    :return:
+    :return: key2value obj
     """
     sitekeys = set()
     sitekey2stats = dict()

@@ -42,7 +42,7 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
     :param fast5_fn: fast5 file path
     :param correct_group: tombo resquiggle group
     :param correct_subgroup: for template or complement
-    :return:
+    :return: raw signals, event table
     """
     try:
         fast5_data = h5py.File(fast5_fn, 'r')
@@ -89,7 +89,7 @@ def _get_alignment_attrs_of_each_strand(strand_path, h5obj):
 
     :param strand_path: template or complement
     :param h5obj: h5py object
-    :return:
+    :return: alignment information
     """
     strand_basecall_group_alignment = h5obj['/'.join([strand_path, 'Alignment'])]
     alignment_attrs = strand_basecall_group_alignment.attrs
@@ -122,7 +122,7 @@ def _get_readid_from_fast5(h5file):
     """
     get read id from a fast5 file h5py obj
     :param h5file:
-    :return:
+    :return: read id/name
     """
     first_read = list(h5file[reads_group].keys())[0]
     if sys.version_info[0] >= 3:
@@ -143,7 +143,7 @@ def _get_alignment_info_from_fast5(fast5_path, corrected_group='RawGenomeCorrect
     :param fast5_path:
     :param corrected_group:
     :param basecall_subgroup:
-    :return:
+    :return: alignment information
     """
     try:
         h5file = h5py.File(fast5_path, mode='r')
@@ -223,7 +223,7 @@ def _get_signals_rect(signals_list, signals_len=16):
     signal features in matrix format
     :param signals_list:
     :param signals_len:
-    :return:
+    :return: matrix format of signals
     """
     signals_rect = []
     for signals_tmp in signals_list:
@@ -280,7 +280,7 @@ def _extract_features(fast5s, corrected_group, basecall_subgroup, normalize_meth
     :param methy_label:
     :param positions:
     :param regioninfo:
-    :return:
+    :return: a list contains features
     """
     features_list = []
     error = 0
@@ -410,7 +410,7 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
     :param methy_label:
     :param positions:
     :param regioninfo:
-    :return:
+    :return: fast5s_q to featurestr_q/errornum_q
     """
     f5_num = 0
     while True:
@@ -511,7 +511,7 @@ def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path,
     :param f5_batch_num:
     :param position_file:
     :param regionstr:
-    :return:
+    :return: motifs, chrom length, queue of fast5s, No. fast5s, region of interest
     """
     fast5_files = get_fast5s(fast5_dir, is_recursive)
     print("{} fast5 files in total..".format(len(fast5_files)))
