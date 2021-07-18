@@ -20,6 +20,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [tombo](https://github.com/nanoporetech/tombo) is required to re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
        [Python3.*](https://www.python.org/)\
+       [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
    - Dependencies:\
        [numpy](http://www.numpy.org/)\
@@ -60,13 +61,15 @@ conda install pytorch==1.4.0 torchvision==0.5.0 cudatoolkit=10.1 -c pytorch
 pip install torch==1.4.0 torchvision==0.5.0
 ```
 
-- [tombo](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
+- [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
 ```bash
 # install using conda
 conda install -c bioconda ont-tombo
 # or install using pip
 pip install ont-tombo
 ```
+
+- Guppy (version>=3.6.1) is also required, which can be downloaded from [Nanopore Community (login required)](https://nanoporetech.com/community).
 
 
 ## Trained models
@@ -84,7 +87,7 @@ Currently we have trained the following models:
 
 
 ## Quick start
-To call modifications, the raw fast5 files should be basecalled ([Guppy>=3.6.1](https://nanoporetech.com/community)) and then be re-squiggled by [tombo](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. Belows are commands to call 5mC in CG, CHG, and CHH contexts:
+To call modifications, the raw fast5 files should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be re-squiggled by [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. Belows are commands to call 5mC in CG, CHG, and CHH contexts:
 ```bash
 # Download and unzip the example data and pre-trained models.
 # 1. guppy basecall using GPU
@@ -107,7 +110,7 @@ python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqf
 
 ## Usage
 #### 1. Basecall and re-squiggle
-Before run deepsignal, the raw reads should be basecalled ([Guppy>=3.6.1](https://nanoporetech.com/community)) and then be processed by the *re-squiggle* module of [tombo](https://github.com/nanoporetech/tombo).
+Before run deepsignal, the raw reads should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
 
 Note:
 - If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
