@@ -5,10 +5,9 @@
 
 [![PyPI-version](https://img.shields.io/pypi/v/deepsignal-plant)](https://pypi.org/project/deepsignal-plant/)
 [![PyPI-Downloads](https://pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
-<!--[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant)-->
-
-[![Conda-version](https://img.shields.io/conda/vn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
+&emsp;[![Conda-version](https://img.shields.io/conda/vn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
 [![Conda-Downloads](https://img.shields.io/conda/dn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
+<!--[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant)-->
 
 ## A deep-learning method for detecting methylation state from Oxford Nanopore sequencing reads of plants.
 deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is built on **Python3** and **PyTorch**.
