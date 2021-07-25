@@ -6,6 +6,10 @@ Release
 -------
 
 
+0.1.3
+-----
+
+
 0.1.2
 -----
 change imports in ref_reader,
@@ -19,7 +23,6 @@ fix MKL_THREADING_LAYER error temporarily,
 add `--region` option,
 
 a combined 5mC model replacing CG/CHG/CHH models
-
 
 
 0.1.1

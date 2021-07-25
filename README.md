@@ -1,10 +1,14 @@
 # DeepSignal-plant
 
 [![Python](https://img.shields.io/pypi/pyversions/deepsignal-plant)](https://www.python.org/)
-[![PyPI version](https://img.shields.io/pypi/v/deepsignal-plant)](https://pypi.org/project/deepsignal-plant/)
-[![GitHub License](https://img.shields.io/github/license/PengNi/deepsignal-plant)](https://github.com/PengNi/deepsignal-plant/blob/master/LICENSE)
+[![GitHub-License](https://img.shields.io/github/license/PengNi/deepsignal-plant)](https://github.com/PengNi/deepsignal-plant/blob/master/LICENSE)
+
+[![PyPI-version](https://img.shields.io/pypi/v/deepsignal-plant)](https://pypi.org/project/deepsignal-plant/)
 [![PyPI-Downloads](https://pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
-[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant)
+<!--[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant)-->
+
+[![Conda-version](https://img.shields.io/conda/vn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
+[![Conda-Downloads](https://img.shields.io/conda/dn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
 
 ## A deep-learning method for detecting methylation state from Oxford Nanopore sequencing reads of plants.
 deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is built on **Python3** and **PyTorch**.
@@ -19,7 +23,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 ## Installation
 deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [Guppy](https://nanoporetech.com/community) and [tombo](https://github.com/nanoporetech/tombo) are required to basecall and re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites:\
-       [Python3.*](https://www.python.org/)\
+       [Python3.*](https://www.python.org/) (version>=3.6)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
    - Dependencies:\
@@ -42,15 +46,19 @@ conda deactivate
 The virtual environment can also be created by using [virtualenv](https://github.com/pypa/virtualenv/).
 
 #### 2. Install deepsignal-plant
-- After creating and activating the environment, download deepsignal-plant (**lastest version**) from github:
+- After the environment being created and activated, deepsignal-plant can be installed from [Bioconda](https://bioconda.github.io/):
+```bash
+conda install -c bioconda deepsignal-plant
+```
+**or** be installed using *pip*:
+```bash
+pip install deepsignal-plant
+```
+deepsignal-plant (**lastest version**) can also be downloaded and installed from github:
 ```bash
 git clone https://github.com/PengNi/deepsignal-plant.git
 cd deepsignal-plant
 python setup.py install
-```
-**or** install deepsignal-plant using *pip*:
-```bash
-pip install deepsignal-plant
 ```
 
 - [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
@@ -110,7 +118,7 @@ python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqf
 
 ## Usage
 #### 1. Basecall and re-squiggle
-Before run deepsignal, the raw reads should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
+Before running deepsignal, the raw reads should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
 
 Note:
 - If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
