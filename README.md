@@ -45,16 +45,15 @@ conda deactivate
 The virtual environment can also be created by using [virtualenv](https://github.com/pypa/virtualenv/).
 
 #### 2. Install deepsignal-plant
-- After the environment being created and activated, deepsignal-plant can be installed from [Bioconda](https://bioconda.github.io/):
+- After the environment being created and activated, deepsignal-plant can be installed using [*conda*](https://anaconda.org/bioconda/deepsignal-plant)/[*pip*](https://pypi.org/project/deepsignal-plant/), or from github directly:
 ```bash
+# install using conda
 conda install -c bioconda deepsignal-plant
-```
-**or** be installed using *pip*:
-```bash
+
+# or install using pip
 pip install deepsignal-plant
-```
-deepsignal-plant (**lastest version**) can also be downloaded and installed from github:
-```bash
+
+# or install from github (lastest version)
 git clone https://github.com/PengNi/deepsignal-plant.git
 cd deepsignal-plant
 python setup.py install
@@ -64,6 +63,7 @@ python setup.py install
 ```bash
 # install using conda
 conda install pytorch==1.4.0 torchvision==0.5.0 cudatoolkit=10.1 -c pytorch
+
 # or install using pip
 pip install torch==1.4.0 torchvision==0.5.0
 ```
@@ -72,6 +72,7 @@ pip install torch==1.4.0 torchvision==0.5.0
 ```bash
 # install using conda
 conda install -c bioconda ont-tombo
+
 # or install using pip
 pip install ont-tombo
 ```
@@ -107,7 +108,6 @@ tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --c
 
 # 3. deepsignal-plant call_mods
 # 5mCs in all contexts (CG, CHG, and CHH) can be called at one time
-# C
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
 deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
 # split 5mC call_freq file into CG/CHG/CHH call_freq files
