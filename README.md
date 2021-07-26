@@ -33,7 +33,7 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.6.0?)
 
 #### 1. Create an environment
-We highly recommend to use a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows by using [conda](https://conda.io/docs/):
+We highly recommend to use a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
 # create
 conda create -n deepsignalpenv python=3.6
@@ -42,10 +42,10 @@ conda activate deepsignalpenv
 # deactivate
 conda deactivate
 ```
-The virtual environment can also be created by using [virtualenv](https://github.com/pypa/virtualenv/).
+The virtual environment can also be created using [virtualenv](https://github.com/pypa/virtualenv/).
 
 #### 2. Install deepsignal-plant
-- After the environment being created and activated, deepsignal-plant can be installed using [*conda*](https://anaconda.org/bioconda/deepsignal-plant)/[*pip*](https://pypi.org/project/deepsignal-plant/), or from github directly:
+- After the environment being created and activated, deepsignal-plant can be installed using [conda](https://anaconda.org/bioconda/deepsignal-plant)/[pip](https://pypi.org/project/deepsignal-plant/), or from github directly:
 ```bash
 # install using conda
 conda install -c bioconda deepsignal-plant
