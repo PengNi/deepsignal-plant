@@ -37,8 +37,10 @@ We highly recommend to use a virtual environment for the installation of deepsig
 ```bash
 # create
 conda create -n deepsignalpenv python=3.6
+
 # activate
 conda activate deepsignalpenv
+
 # deactivate
 conda deactivate
 ```
