@@ -124,6 +124,8 @@ def _call_mods(features_batch, model, batch_size):
         b_base_signal_lens = base_signal_lens[batch_s:batch_e]
         b_k_signals = k_signals[batch_s:batch_e]
         b_labels = labels[batch_s:batch_e]
+
+        # call mods of each batch
         if len(b_sampleinfo) > 0:
             voutputs, vlogits = model(FloatTensor(b_kmers), FloatTensor(b_base_means), FloatTensor(b_base_stds),
                                       FloatTensor(b_base_signal_lens), FloatTensor(b_k_signals))
@@ -341,6 +343,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         nproc = nproc_gpu + 1 + 1
 
     fast5s_q.put("kill")
+    # queues of fast5s->features
     features_batch_procs = []
     for _ in range(nproc - nproc_gpu - 1):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
@@ -350,6 +353,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p.start()
         features_batch_procs.append(p)
 
+    # queues of features->mods_call
     call_mods_gpu_procs = []
     for _ in range(nproc_gpu):
         p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
@@ -358,6 +362,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         p_call_mods_gpu.start()
         call_mods_gpu_procs.append(p_call_mods_gpu)
 
+    # queue of writing
     # print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
     p_w.daemon = True
@@ -416,6 +421,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
         nproc = nproc_call_mods + 1 + 1
 
     fast5s_q.put("kill")
+    # queues of features->mods_call
     features_batch_procs = []
     for _ in range(nproc - nproc_call_mods - 1):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
@@ -425,6 +431,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
         p.start()
         features_batch_procs.append(p)
 
+    # queues of features->mods_call
     call_mods_gpu_procs = []
     for _ in range(nproc_call_mods):
         p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
@@ -433,6 +440,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
         p_call_mods_gpu.start()
         call_mods_gpu_procs.append(p_call_mods_gpu)
 
+    # queue of writing
     # print("write_process started..")
     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
     p_w.daemon = True

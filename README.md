@@ -97,7 +97,7 @@ Currently we have trained the following models:
 
 
 ## Quick start
-To call modifications, the raw fast5 files should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be re-squiggled by [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. Belows are commands to call 5mC in CG, CHG, and CHH contexts:
+To call modifications, the raw fast5 files should be basecalled by [Guppy (version>=3.6.1)](https://nanoporetech.com/community) and then be re-squiggled by [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo). At last, modifications of specified motifs can be called by deepsignal. Belows are commands to call 5mC in CG, CHG, and CHH contexts:
 ```bash
 # Download and unzip the example data and pre-trained models.
 # 1. guppy basecall using GPU
@@ -119,7 +119,7 @@ python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqf
 
 ## Usage
 #### 1. Basecall and re-squiggle
-Before running deepsignal, the raw reads should be basecalled ([Guppy (version>=3.6.1)](https://nanoporetech.com/community)) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
+Before running deepsignal, the raw reads should be basecalled by [Guppy (version>=3.6.1)](https://nanoporetech.com/community) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
 
 Note:
 - If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
