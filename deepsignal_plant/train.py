@@ -75,9 +75,18 @@ def train(args):
         optimizer = torch.optim.RMSprop(model.parameters(), lr=args.lr)
     elif args.optim_type == "SGD":
         optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.8)
+    elif args.optim_type == "Ranger":
+        # use Ranger optimizer
+        # refer to https://github.com/lessw2020/Ranger-Deep-Learning-Optimizer
+        # needs python>=3.6
+        try:
+            from .utils.ranger2020 import Ranger
+        except ImportError:
+            raise ImportError("please check if ranger2020.py is in utils/ dir!")
+        optimizer = Ranger(model.parameters(), lr=args.lr)
     else:
         raise ValueError("optim_type is not right!")
-    scheduler = StepLR(optimizer, step_size=2, gamma=0.1)
+    scheduler = StepLR(optimizer, step_size=args.lr_decay_step, gamma=args.lr_decay)
 
     # Train the model
     total_step = len(train_loader)
@@ -113,7 +122,7 @@ def train(args):
             if (i + 1) % args.step_interval == 0:
                 model.eval()
                 with torch.no_grad():
-                    vlosses, vaccus, vprecs, vrecas = [], [], [], []
+                    vlosses, vlabels_total, vpredicted_total = [], [], []
                     for vi, vsfeatures in enumerate(valid_loader):
                         _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals, vlabels = vsfeatures
                         if use_cuda:
@@ -131,18 +140,23 @@ def train(args):
                         if use_cuda:
                             vlabels = vlabels.cpu()
                             vpredicted = vpredicted.cpu()
-                        i_accuracy = metrics.accuracy_score(vlabels.numpy(), vpredicted)
-                        i_precision = metrics.precision_score(vlabels.numpy(), vpredicted)
-                        i_recall = metrics.recall_score(vlabels.numpy(), vpredicted)
+                        # i_accuracy = metrics.accuracy_score(vlabels.numpy(), vpredicted)
+                        # i_precision = metrics.precision_score(vlabels.numpy(), vpredicted)
+                        # i_recall = metrics.recall_score(vlabels.numpy(), vpredicted)
 
-                        vaccus.append(i_accuracy)
-                        vprecs.append(i_precision)
-                        vrecas.append(i_recall)
+                        # vaccus.append(i_accuracy)
+                        # vprecs.append(i_precision)
+                        # vrecas.append(i_recall)
                         vlosses.append(vloss.item())
+                        vlabels_total += vlabels
+                        vpredicted_total += vpredicted
 
-                    if np.mean(vaccus) > curr_best_accuracy_epoch:
-                        curr_best_accuracy_epoch = np.mean(vaccus)
-                        if curr_best_accuracy_epoch > curr_best_accuracy - 0.001:
+                    v_accuracy = metrics.accuracy_score(vlabels_total, vpredicted_total)
+                    v_precision = metrics.precision_score(vlabels_total, vpredicted_total)
+                    v_recall = metrics.recall_score(vlabels_total, vpredicted_total)
+                    if v_accuracy > curr_best_accuracy_epoch:
+                        curr_best_accuracy_epoch = v_accuracy
+                        if curr_best_accuracy_epoch > curr_best_accuracy - 0.0005:
                             torch.save(model.state_dict(),
                                        model_dir + args.model_type + '.b{}_s{}_epoch{}.ckpt'.format(args.seq_len,
                                                                                                     args.signal_len,
@@ -154,7 +168,7 @@ def train(args):
                           'Accuracy: {:.4f}, Precision: {:.4f}, Recall: {:.4f}, '
                           'curr_epoch_best_accuracy: {:.4f}; Time: {:.2f}s'
                           .format(epoch + 1, args.max_epoch_num, i + 1, total_step, np.mean(tlosses),
-                                  np.mean(vlosses), np.mean(vaccus), np.mean(vprecs), np.mean(vrecas),
+                                  np.mean(vlosses), v_accuracy, v_precision, v_recall,
                                   curr_best_accuracy_epoch, time_cost))
                     tlosses = []
                     start = time.time()
@@ -211,10 +225,14 @@ def main():
                         help="BiLSTM hidden_size for combined feature")
 
     # model training
-    parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],
-                        required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop', default Adam")
+    parser.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD",
+                                                                           "Ranger"],
+                        required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop' or 'Ranger', "
+                                             "default Adam")
     parser.add_argument('--batch_size', type=int, default=512, required=False)
     parser.add_argument('--lr', type=float, default=0.001, required=False)
+    parser.add_argument('--lr_decay', type=float, default=0.1, required=False)
+    parser.add_argument('--lr_decay_step', type=int, default=2, required=False)
     parser.add_argument("--max_epoch_num", action="store", default=10, type=int,
                         required=False, help="max epoch num, default 10")
     parser.add_argument("--min_epoch_num", action="store", default=5, type=int,

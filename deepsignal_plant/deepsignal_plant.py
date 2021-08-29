@@ -355,10 +355,14 @@ def main():
     st_train.add_argument('--hid_rnn', type=int, default=256, required=False,
                           help="BiLSTM hidden_size for combined feature")
     # model training
-    st_train.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD"],
-                          required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop', default Adam")
+    st_train.add_argument('--optim_type', type=str, default="Adam", choices=["Adam", "RMSprop", "SGD",
+                                                                             "Ranger"],
+                          required=False, help="type of optimizer to use, 'Adam' or 'SGD' or 'RMSprop' or 'Ranger', "
+                                               "default Adam")
     st_train.add_argument('--batch_size', type=int, default=512, required=False)
     st_train.add_argument('--lr', type=float, default=0.001, required=False)
+    st_train.add_argument('--lr_decay', type=float, default=0.1, required=False)
+    st_train.add_argument('--lr_decay_step', type=int, default=2, required=False)
     st_train.add_argument("--max_epoch_num", action="store", default=10, type=int,
                           required=False, help="max epoch num, default 10")
     st_train.add_argument("--min_epoch_num", action="store", default=5, type=int,
