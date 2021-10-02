@@ -12,6 +12,11 @@
 ## A deep-learning method for detecting methylation state from Oxford Nanopore sequencing reads of plants.
 deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is built on **Python3** and **PyTorch**.
 
+
+#### Known issues
+- The VBZ compression issue is not completely solved yet, please refer to [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [tombo issue #254](https://github.com/nanoporetech/tombo/issues/254), and [vbz_compression issue #5](https://github.com/nanoporetech/vbz_compression/issues/5) for now. We have been working on it and will solve it ASAP.
+
+
 ## Contents
 - [Installation](#Installation)
 - [Trained models](#Trained-models)
