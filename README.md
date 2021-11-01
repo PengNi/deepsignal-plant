@@ -22,7 +22,8 @@ sudo apt-get install libhdf5-serial-dev hdf5-tools
 # centos
 sudo yum install hdf5-devel
 
-# 2. download ont-vbz-hdf-plugin-1.0.0-Linux-x86_64.tar.gz and set HDF5_PLUGIN_PATH
+# 2. download ont-vbz-hdf-plugin-1.0.1-Linux-x86_64.tar.gz (or newer version) and set HDF5_PLUGIN_PATH
+# https://github.com/nanoporetech/vbz_compression/releases
 wget https://github.com/nanoporetech/vbz_compression/releases/download/v1.0.1/ont-vbz-hdf-plugin-1.0.1-Linux-x86_64.tar.gz
 tar zxvf ont-vbz-hdf-plugin-1.0.1-Linux-x86_64.tar.gz
 export HDF5_PLUGIN_PATH=/abslolute/path/to/ont-vbz-hdf-plugin-1.0.1-Linux/usr/local/hdf5/lib/plugin
