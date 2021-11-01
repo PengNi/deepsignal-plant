@@ -8,6 +8,8 @@ Release
 
 0.1.3
 -----
+add ranger optimizer and modify train module,
+
 
 
 0.1.2
