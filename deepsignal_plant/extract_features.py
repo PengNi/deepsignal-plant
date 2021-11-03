@@ -13,9 +13,12 @@ import time
 import h5py
 import random
 import numpy as np
+
 import multiprocessing as mp
-# from .utils.process_utils import Queue
-from multiprocessing import Queue
+
+from .utils.process_utils import MyQueue as Queue
+# from multiprocessing import Queue
+
 from statsmodels import robust
 
 from .utils.process_utils import str2bool
@@ -499,23 +502,7 @@ def _read_position_file(position_file):
     return postions
 
 
-def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path, f5_batch_num,
-                        position_file, regionstr):
-    """
-    prepare necessary information for feature extraction
-    :param fast5_dir:
-    :param is_recursive:
-    :param motifs:
-    :param is_dna:
-    :param reference_path:
-    :param f5_batch_num:
-    :param position_file:
-    :param regionstr:
-    :return: motifs, chrom length, queue of fast5s, No. fast5s, region of interest
-    """
-    fast5_files = get_fast5s(fast5_dir, is_recursive)
-    print("{} fast5 files in total..".format(len(fast5_files)))
-
+def _extract_preprocess_(motifs, is_dna, reference_path, position_file, regionstr):
     print("parse the motifs string..")
     motif_seqs = get_motif_seqs(motifs, is_dna)
 
@@ -531,11 +518,40 @@ def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path,
     chrom, start, end = regioninfo
     print("parse region of interest: {}, [{}, {})".format(chrom, start, end))
 
-    # fast5s_q = mp.Queue()
-    fast5s_q = Queue()
+    return motif_seqs, chrom2len, positions, regioninfo
+
+
+def _extract_preprocess_fast5sinfo(fast5_dir, is_recursive, f5_batch_num, fast5s_q):
+    fast5_files = get_fast5s(fast5_dir, is_recursive)
+    print("{} fast5 files in total..".format(len(fast5_files)))
     _fill_files_queue(fast5s_q, fast5_files, f5_batch_num)
 
-    return motif_seqs, chrom2len, fast5s_q, len(fast5_files), positions, regioninfo
+    return fast5s_q, len(fast5_files)
+
+
+def _extract_preprocess(fast5_dir, is_recursive, motifs, is_dna, reference_path, f5_batch_num,
+                        position_file, regionstr):
+    """
+    prepare necessary information for feature extraction
+    :param fast5_dir:
+    :param is_recursive:
+    :param motifs:
+    :param is_dna:
+    :param reference_path:
+    :param f5_batch_num:
+    :param position_file:
+    :param regionstr:
+    :return: motifs, chrom length, queue of fast5s, No. fast5s, region of interest
+    """
+
+    # fast5s_q = mp.Queue()
+    fast5s_q = Queue()
+    fast5s_q, len_fast5s = _extract_preprocess_fast5sinfo(fast5_dir, is_recursive, f5_batch_num, fast5s_q)
+
+    motif_seqs, chrom2len, positions, regioninfo = _extract_preprocess_(motifs, is_dna, reference_path,
+                                                                        position_file, regionstr)
+
+    return motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo
 
 
 def extract_features(fast5_dir, is_recursive, reference_path, is_dna,

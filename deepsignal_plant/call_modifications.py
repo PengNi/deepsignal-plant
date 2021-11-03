@@ -16,13 +16,7 @@ from sklearn import metrics
 
 # import multiprocessing as mp
 import torch.multiprocessing as mp
-try:
-    mp.set_start_method('spawn')
-except RuntimeError:
-    pass
 
-# from .utils.process_utils import Queue
-from torch.multiprocessing import Queue
 import time
 
 from .models import ModelBiLSTM
@@ -33,12 +27,19 @@ from .utils.process_utils import display_args
 from .utils.process_utils import nproc_to_call_mods_in_cpu_mode
 
 from .extract_features import _extract_features
-from .extract_features import _extract_preprocess
+from .extract_features import _extract_preprocess_
+from .extract_features import _extract_preprocess_fast5sinfo
 
 from .utils.constants_torch import FloatTensor
 from .utils.constants_torch import use_cuda
 
 import uuid
+
+if use_cuda:
+    # from .utils.process_utils import MyQueue as Queue
+    from torch.multiprocessing import Queue
+else:
+    from .utils.process_utils import MyQueue as Queue
 
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
@@ -566,8 +567,16 @@ def call_mods(args):
     :param args: argparse object
     :return: main function
     """
+
     print("[main] call_mods starts..")
     start = time.time()
+
+    print("cuda availability: {}".format(use_cuda))
+    if use_cuda:
+        try:
+            mp.set_start_method('spawn')
+        except RuntimeError:
+            raise RuntimeError("torch.multiprocessing -> RuntimeError")
 
     model_path = os.path.abspath(args.model_path)
     if not os.path.exists(model_path):
@@ -584,15 +593,22 @@ def call_mods(args):
             raise ValueError("--reference_path is required to be set!")
         if not os.path.exists(args.reference_path):
             raise ValueError("--reference_path is not set right!")
-        motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, \
-            regioninfo = _extract_preprocess(input_path,
-                                             str2bool(args.recursively),
-                                             args.motifs,
-                                             str2bool(args.is_dna),
-                                             args.reference_path,
-                                             args.f5_batch_size,
-                                             args.positions,
-                                             args.region)
+        # motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, \
+        #     regioninfo = _extract_preprocess(input_path,
+        #                                      str2bool(args.recursively),
+        #                                      args.motifs,
+        #                                      str2bool(args.is_dna),
+        #                                      args.reference_path,
+        #                                      args.f5_batch_size,
+        #                                      args.positions,
+        #                                      args.region)
+        fast5s_q = Queue()
+        fast5s_q, len_fast5s = _extract_preprocess_fast5sinfo(input_path, str2bool(args.recursively),
+                                                              args.f5_batch_size, fast5s_q)
+
+        motif_seqs, chrom2len, positions, regioninfo = _extract_preprocess_(args.motifs, str2bool(args.is_dna),
+                                                                            args.reference_path,
+                                                                            args.positions, args.region)
         if use_cuda:
             _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, regioninfo,
                                        model_path,

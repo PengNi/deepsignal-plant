@@ -2,8 +2,13 @@ from __future__ import absolute_import
 import fnmatch
 import os
 import random
-import multiprocessing
+
+import multiprocessing as mp
+# import torch.multiprocessing as mp
+
 import multiprocessing.queues
+# import torch.multiprocessing.queue
+
 import numpy as np
 import gc
 import math
@@ -517,7 +522,7 @@ class SharedCounter(object):
     """
 
     def __init__(self, n=0):
-        self.count = multiprocessing.Value('i', n)
+        self.count = mp.Value('i', n)
 
     def increment(self, n=1):
         """ Increment the counter by n (default = 1) """
@@ -531,7 +536,7 @@ class SharedCounter(object):
 
 
 # https://github.com/vterron/lemon/commit/9ca6b4b1212228dbd4f69b88aaf88b12952d7d6f
-class Queue(multiprocessing.queues.Queue):
+class MyQueue(multiprocessing.queues.Queue):
     """ A portable implementation of multiprocessing.Queue.
     Because of multithreading / multiprocessing semantics, Queue.qsize() may
     raise the NotImplementedError exception on Unix platforms like Mac OS X
@@ -544,16 +549,16 @@ class Queue(multiprocessing.queues.Queue):
     """
 
     def __init__(self, *args, **kwargs):
-        super(Queue, self).__init__(*args, ctx=multiprocessing.get_context(), **kwargs)
+        super(MyQueue, self).__init__(*args, ctx=mp.get_context(), **kwargs)
         self._size = SharedCounter(0)
 
     def put(self, *args, **kwargs):
-        super(Queue, self).put(*args, **kwargs)
+        super(MyQueue, self).put(*args, **kwargs)
         self._size.increment(1)
 
     def get(self, *args, **kwargs):
         self._size.increment(-1)
-        return super(Queue, self).get(*args, **kwargs)
+        return super(MyQueue, self).get(*args, **kwargs)
 
     def qsize(self) -> int:
         """ Reliable implementation of multiprocessing.Queue.qsize() """

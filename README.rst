@@ -10,6 +10,8 @@ Release
 -----
 add ranger optimizer and modify train module,
 
+fix Queue.qsize() NotImplementedError in macOS partially, however *call_mods* in CUDA mode in macOS still doesn't work,
+
 
 
 0.1.2
