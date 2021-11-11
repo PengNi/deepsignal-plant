@@ -74,7 +74,7 @@ conda install -c bioconda deepsignal-plant
 # or install using pip
 pip install deepsignal-plant
 
-# or install from github (lastest version)
+# or install from github (latest version)
 git clone https://github.com/PengNi/deepsignal-plant.git
 cd deepsignal-plant
 python setup.py install

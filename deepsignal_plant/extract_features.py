@@ -498,6 +498,9 @@ def _read_position_file(position_file):
     with open(position_file, 'r') as rf:
         for line in rf:
             words = line.strip().split("\t")
+            if len(words) < 3:
+                raise ValueError("--position file in wrong format. "
+                                 "If you didn't use Tab as delimiter, Please do.")
             postions.add(key_sep.join(words[:3]))
     return postions
 
@@ -509,10 +512,12 @@ def _extract_preprocess_(motifs, is_dna, reference_path, position_file, regionst
     print("read genome reference file..")
     chrom2len = get_contig2len(reference_path)
 
-    print("read position file: {}".format(position_file))
     positions = None
+    num_poses = 0
     if position_file is not None:
         positions = _read_position_file(position_file)
+        num_poses = len(positions)
+    print("read position file: {}, got {} positions".format(position_file, num_poses))
 
     regioninfo = parse_region_str(regionstr)
     chrom, start, end = regioninfo
