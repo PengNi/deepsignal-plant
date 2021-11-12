@@ -250,7 +250,7 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioni
     features_list, error = _extract_features(fast5s, args.corrected_group, args.basecall_subgroup,
                                              args.normalize_method, motif_seqs, args.mod_loc, chrom2len,
                                              args.seq_len, args.signal_len,
-                                             args.methy_label, positions, regioninfo)
+                                             1, positions, regioninfo)
     features_batches = []
 
     sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
@@ -746,10 +746,10 @@ def main():
                       default="mad", required=False,
                       help="the way for normalizing signals in read level. "
                            "mad or zscore, default mad")
-    p_f5.add_argument("--methy_label", action="store", type=int,
-                      choices=[1, 0], required=False, default=1,
-                      help="the label of the interested modified bases, this is for training."
-                           " 0 or 1, default 1")
+    # p_f5.add_argument("--methy_label", action="store", type=int,
+    #                   choices=[1, 0], required=False, default=1,
+    #                   help="the label of the interested modified bases, this is for training."
+    #                        " 0 or 1, default 1")
     p_f5.add_argument("--motifs", action="store", type=str,
                       required=False, default='CG',
                       help='motif seq to be extracted, default: CG. '

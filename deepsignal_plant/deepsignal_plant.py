@@ -279,10 +279,10 @@ def main():
                        default="mad", required=False,
                        help="the way for normalizing signals in read level. "
                             "mad or zscore, default mad")
-    sc_f5.add_argument("--methy_label", action="store", type=int,
-                       choices=[1, 0], required=False, default=1,
-                       help="the label of the interested modified bases, this is for training."
-                            " 0 or 1, default 1")
+    # sc_f5.add_argument("--methy_label", action="store", type=int,
+    #                    choices=[1, 0], required=False, default=1,
+    #                    help="the label of the interested modified bases, this is for training."
+    #                         " 0 or 1, default 1")
     sc_f5.add_argument("--motifs", action="store", type=str,
                        required=False, default='CG',
                        help='motif seq to be extracted, default: CG. '
