@@ -370,6 +370,8 @@ def main():
     st_train.add_argument('--step_interval', type=int, default=100, required=False)
 
     st_train.add_argument('--pos_weight', type=float, default=1.0, required=False)
+    st_train.add_argument('--init_model', type=str, default=None, required=False,
+                          help="file path of pre-trained model parameters to load before training")
     # st_train.add_argument('--seed', type=int, default=1234,
     #                        help='random seed')
     # else

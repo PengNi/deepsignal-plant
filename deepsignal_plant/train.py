@@ -63,6 +63,13 @@ def train(args):
                         args.model_type)
     if use_cuda:
         model = model.cuda()
+    if args.init_model is not None:
+        print("loading pre-trained model: {}".format(args.init_model))
+        para_dict = torch.load(args.init_model) if use_cuda else torch.load(args.init_model,
+                                                                            map_location=torch.device('cpu'))
+        model_dict = model.state_dict()
+        model_dict.update(para_dict)
+        model.load_state_dict(model_dict)
 
     # Loss and optimizer
     weight_rank = torch.from_numpy(np.array([1, args.pos_weight])).float()
@@ -240,6 +247,8 @@ def main():
     parser.add_argument('--step_interval', type=int, default=100, required=False)
 
     parser.add_argument('--pos_weight', type=float, default=1.0, required=False)
+    parser.add_argument('--init_model', type=str, default=None, required=False,
+                        help="file path of pre-trained model parameters to load before training")
     # parser.add_argument('--seed', type=int, default=1234,
     #                     help='random seed')
 

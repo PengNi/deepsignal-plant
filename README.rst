@@ -12,6 +12,8 @@ add ranger optimizer and modify train module,
 
 fix Queue.qsize() NotImplementedError in macOS partially, however *call_mods* in CUDA mode in macOS still doesn't work,
 
+add `init_model` option in train module
+
 
 
 0.1.2
