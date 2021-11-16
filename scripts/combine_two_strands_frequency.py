@@ -132,7 +132,7 @@ def write_mpos2covinfo_deep(mclist, reportfp):
 def main():
     parser = argparse.ArgumentParser("combine modification_frequency of CG in forward and backward strand")
     parser.add_argument("--frequency_fp", help="the call_modification_frequency file path, "
-                                               "in freq.txt or .bed format",
+                                               "in .freq.txt or .bed format",
                         type=str, required=True)
     parser.add_argument('-r', "--ref_fp", help="the file path of genome reference",
                         type=str, required=True)

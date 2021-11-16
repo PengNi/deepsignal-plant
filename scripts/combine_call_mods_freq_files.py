@@ -30,7 +30,7 @@ def _get_combined_freq_file(freqfiles):
         for fkey in finfo_tmp.keys():
             if fkey not in freqkeys:
                 freqkeys.add(fkey)
-                freqinfo[fkey] = [-1, 0.0, 0.0, 0, 0, 0, 0.0, ""]
+                freqinfo[fkey] = [-1, 0.0, 0.0, 0, 0, 0, 0.0, "-"]
             freqinfo[fkey][0] = finfo_tmp[fkey][0]
             freqinfo[fkey][1] += finfo_tmp[fkey][1]
             freqinfo[fkey][2] += finfo_tmp[fkey][2]
@@ -42,7 +42,7 @@ def _get_combined_freq_file(freqfiles):
     return freqinfo
 
 
-def _write_freqinfo(freqinfo, wfile, is_sort):
+def _write_freqinfo(freqinfo, wfile, is_sort, is_bed):
     wf = open(wfile, "w")
     if is_sort:
         fkeys = sorted(list(freqinfo.keys()))
@@ -50,13 +50,19 @@ def _write_freqinfo(freqinfo, wfile, is_sort):
         fkeys = list(freqinfo.keys())
     for fkey in fkeys:
         tmpinfo = list(fkey) + freqinfo[fkey]
-        wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (tmpinfo[0], tmpinfo[1], tmpinfo[2],
-                                                                                 tmpinfo[3],
-                                                                                 tmpinfo[4],
-                                                                                 tmpinfo[5],
-                                                                                 tmpinfo[6], tmpinfo[7],
-                                                                                 tmpinfo[8], tmpinfo[9],
-                                                                                 tmpinfo[10]))
+        if is_bed:
+            wf.write("\t".join([tmpinfo[0], str(tmpinfo[1]), str(tmpinfo[1] + 1), ".", str(tmpinfo[8]),
+                                tmpinfo[2],
+                                str(tmpinfo[1]), str(tmpinfo[1] + 1), "0,0,0", str(tmpinfo[8]),
+                                str(int(round(tmpinfo[9] * 100, 0)))]) + "\n")
+        else:
+            wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (tmpinfo[0], tmpinfo[1], tmpinfo[2],
+                                                                             tmpinfo[3],
+                                                                             tmpinfo[4],
+                                                                             tmpinfo[5],
+                                                                             tmpinfo[6], tmpinfo[7],
+                                                                             tmpinfo[8], tmpinfo[9],
+                                                                             tmpinfo[10]))
     wf.close()
 
 
@@ -78,19 +84,20 @@ def combine_freq_files(args):
             raise ValueError()
     print("get {} input file(s)..".format(len(modsfiles)))
     freqinfo = _get_combined_freq_file(modsfiles)
-    _write_freqinfo(freqinfo, args.wfile, args.sort)
+    _write_freqinfo(freqinfo, args.wfile, args.sort, args.bed)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--modspath", action="append", type=str, required=True,
-                        help="call_mods_freq file or dir")
+                        help="call_mods_freq file or dir, files all in .freq.txt format")
     parser.add_argument("--wfile", type=str, required=True,
-                        help="")
+                        help=".freq.txt or .bed format")
     parser.add_argument('--file_uid', type=str, action="store", required=False, default=None,
                         help='a unique str which all input files has, this is for finding all input files and ignoring '
                              'the un-input-files in a input directory. if input_path is a file, ignore this arg.')
     parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
+    parser.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
 
     args = parser.parse_args()
     combine_freq_files(args)
