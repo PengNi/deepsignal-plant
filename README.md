@@ -14,7 +14,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 
 
 #### Known issues
-- The VBZ compression issue is not completely solved yet. Please try the commands listed below, and refer to [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [tombo issue #254](https://github.com/nanoporetech/tombo/issues/254), and [vbz_compression issue #5](https://github.com/nanoporetech/vbz_compression/issues/5) for now. We have been working on it and will solve it ASAP.
+- The VBZ compression issue is not completely solved yet. Please try the commands listed below, normally it will work after setting `HDF5_PLUGIN_PATH`:
 ```shell
 # 1. install hdf5/hdf5-tools
 # ubuntu
@@ -28,6 +28,7 @@ wget https://github.com/nanoporetech/vbz_compression/releases/download/v1.0.1/on
 tar zxvf ont-vbz-hdf-plugin-1.0.1-Linux-x86_64.tar.gz
 export HDF5_PLUGIN_PATH=/abslolute/path/to/ont-vbz-hdf-plugin-1.0.1-Linux/usr/local/hdf5/lib/plugin
 ```
+References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [tombo issue #254](https://github.com/nanoporetech/tombo/issues/254), and [vbz_compression issue #5](https://github.com/nanoporetech/vbz_compression/issues/5).
 
 
 
@@ -103,7 +104,7 @@ pip install ont-tombo
 
 ## Trained models
 
-Currently we have trained the following models:
+Currently, we have trained the following models:
    * _[model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt](https://drive.google.com/file/d/1HnDKPEfCAXgo7vPN-zaD44Kqz1SDw160/view?usp=sharing)_: A 5mC model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
 
 
