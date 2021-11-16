@@ -105,9 +105,6 @@ pip install ont-tombo
 
 Currently we have trained the following models:
    * _[model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt](https://drive.google.com/file/d/1HnDKPEfCAXgo7vPN-zaD44Kqz1SDw160/view?usp=sharing)_: A 5mC model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * (deprecated) _[model.dp2.CG.arabnrice2-1_R9.4plus_tem.bn13_sn16.balance.both_bilstm.b13_s16_epoch6.ckpt](https://drive.google.com/file/d/1BRThGKdRS6cCRXomJ0sGK2vXCFtWbhv7/view?usp=sharing)_: A CpG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * (deprecated) _[model.dp2.CHG.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch4.ckpt](https://drive.google.com/file/d/1mRWIWVvoHnktKzvatvuH59Wg8TFTNSac/view?usp=sharing)_: A CHG (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
-   * (deprecated) _[model.dp2.CHH.arabnrice2-1_R9.4plus_tem.bn13_sn16.denoise_signal_bilstm.both_bilstm.b13_s16_epoch7.ckpt](https://drive.google.com/file/d/1CiIEzhoJvN2OUy4vTfDSe6c2ig6d0j8w/view?usp=sharing)_: A CHH (5mC) model trained using _A. thaliana_ and _O. sativa_ R9.4 1D reads.
 
 
 ## Example data
