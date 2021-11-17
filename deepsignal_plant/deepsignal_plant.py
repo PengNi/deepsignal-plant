@@ -177,7 +177,7 @@ def main():
                                required=False, default=None,
                                help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
                                     "0-based, half-open interval: [start, end). "
-                                    "default None, means processing the whole sites in genome")
+                                    "default None, means processing all sites in genome")
     se_extraction.add_argument("--positions", action="store", type=str,
                                required=False, default=None,
                                help="file with a list of positions interested (must be formatted as tab-separated file"

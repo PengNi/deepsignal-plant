@@ -513,15 +513,15 @@ def _extract_preprocess_(motifs, is_dna, reference_path, position_file, regionst
     chrom2len = get_contig2len(reference_path)
 
     positions = None
-    num_poses = 0
     if position_file is not None:
         positions = _read_position_file(position_file)
         num_poses = len(positions)
-    print("read position file: {}, got {} positions".format(position_file, num_poses))
+        print("read position file: {}, got {} positions".format(position_file, num_poses))
 
     regioninfo = parse_region_str(regionstr)
-    chrom, start, end = regioninfo
-    print("parse region of interest: {}, [{}, {})".format(chrom, start, end))
+    if regionstr is not None:
+        chrom, start, end = regioninfo
+        print("parse region of interest: {}, [{}, {})".format(chrom, start, end))
 
     return motif_seqs, chrom2len, positions, regioninfo
 
@@ -566,6 +566,9 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      position_file, regionstr, w_is_dir, w_batch_num):
     print("[main] extract_features starts..")
     start = time.time()
+
+    if not os.path.isdir(fast5_dir):
+        raise ValueError("--fast5_dir is not a directory!")
 
     motif_seqs, chrom2len, fast5s_q, len_fast5s, \
         positions, regioninfo = _extract_preprocess(fast5_dir, is_recursive,
@@ -679,7 +682,7 @@ def main():
                                required=False, default=None,
                                help="region of interest, e.g.: chr1, chr1:0, chr1:0-10000. "
                                     "0-based, half-open interval: [start, end). "
-                                    "default None, means processing the whole sites in genome")
+                                    "default None, means processing all sites in genome")
     ep_extraction.add_argument("--positions", action="store", type=str,
                                required=False, default=None,
                                help="file with a list of positions interested (must be formatted as tab-separated file"
