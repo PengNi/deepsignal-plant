@@ -50,10 +50,10 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [h5py](https://github.com/h5py/h5py)\
        [statsmodels](https://github.com/statsmodels/statsmodels/)\
        [scikit-learn](https://scikit-learn.org/stable/)\
-       [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.6.0?)
+       [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.7.0?)
 
 #### 1. Create an environment
-We highly recommend to use a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
+We highly recommend using a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
 # create
 conda create -n deepsignalpenv python=3.6
@@ -118,19 +118,34 @@ To call modifications, the raw fast5 files should be basecalled by [Guppy (versi
 ```bash
 # Download and unzip the example data and pre-trained models.
 # 1. guppy basecall using GPU
-guppy_basecaller -i fast5s/ -r -s fast5s_guppy --config dna_r9.4.1_450bps_hac_prom.cfg --device CUDA:0
+guppy_basecaller -i fast5s/ -r -s fast5s_guppy \
+  --config dna_r9.4.1_450bps_hac_prom.cfg \
+  --device CUDA:0
 
 # 2. tombo resquiggle
 cat fast5s_guppy/*.fastq > fast5s_guppy.fastq
-tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ --fastq-filenames fast5s_guppy.fastq --basecall-group Basecall_1D_000 --basecall-subgroup BaseCalled_template --overwrite --processes 10
-tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --corrected-group RawGenomeCorrected_000 --basecall-group Basecall_1D_000 --overwrite
+tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ \
+  --fastq-filenames fast5s_guppy.fastq \
+  --sequencing-summary-filenames fast5s_guppy/sequencing_summary.txt \
+  --basecall-group Basecall_1D_000 --basecall-subgroup BaseCalled_template \
+  --overwrite --processes 10
+tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna \
+  --processes 10 --corrected-group RawGenomeCorrected_000 \
+  --basecall-group Basecall_1D_000 --overwrite
 
 # 3. deepsignal-plant call_mods
 # 5mCs in all contexts (CG, CHG, and CHH) can be called at one time
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
-deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --corrected_group RawGenomeCorrected_000 \
+  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
+  --motifs C --nproc 30 --nproc_gpu 6
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv \
+  --result_file fast5s.C.call_mods.frequency.tsv
 # split 5mC call_freq file into CG/CHG/CHH call_freq files
-python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py --freqfile fast5s.C.call_mods.frequency.tsv
+python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py \
+  --freqfile fast5s.C.call_mods.frequency.tsv
 ```
 
 
@@ -148,16 +163,25 @@ multi_to_single_fast5 -i $multi_read_fast5_dir -s $single_read_fast5_dir -t 30 -
 For the example data:
 ```bash
 # 1. basecall using GPU
-guppy_basecaller -i fast5s/ -r -s fast5s_guppy --config dna_r9.4.1_450bps_hac_prom.cfg --device CUDA:0
+guppy_basecaller -i fast5s/ -r -s fast5s_guppy \
+  --config dna_r9.4.1_450bps_hac_prom.cfg \
+  --device CUDA:0
 # or using CPU
-guppy_basecaller -i fast5s/ -r -s fast5s_guppy --config dna_r9.4.1_450bps_hac_prom.cfg
+guppy_basecaller -i fast5s/ -r -s fast5s_guppy \
+  --config dna_r9.4.1_450bps_hac_prom.cfg
 
 # 2. proprecess fast5 if basecall results are saved in fastq format
 cat fast5s_guppy/*.fastq > fast5s_guppy.fastq
-tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ --fastq-filenames fast5s_guppy.fastq --basecall-group Basecall_1D_000 --basecall-subgroup BaseCalled_template --overwrite --processes 10
+tombo preprocess annotate_raw_with_fastqs --fast5-basedir fast5s/ \
+  --fastq-filenames fast5s_guppy.fastq \
+  --sequencing-summary-filenames fast5s_guppy/sequencing_summary.txt \
+  --basecall-group Basecall_1D_000 --basecall-subgroup BaseCalled_template \
+  --overwrite --processes 10
 
 # 3. resquiggle, cmd: tombo resquiggle $fast5_dir $reference_fa
-tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna --processes 10 --corrected-group RawGenomeCorrected_000 --basecall-group Basecall_1D_000 --overwrite
+tombo resquiggle fast5s/ GCF_000001735.4_TAIR10.1_genomic.fna \
+  --processes 10 --corrected-group RawGenomeCorrected_000 \
+  --basecall-group Basecall_1D_000 --overwrite
 ```
 
 #### 2. extract features
@@ -166,7 +190,9 @@ Features of targeted sites can be extracted for training or testing.
 For the example data (By default, deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
 ```bash
 # extract features of all Cs
-deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 --nproc 30 --motifs C
+deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
+  -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 \
+  --nproc 30 --motifs C
 ```
 
 The extracted_features file is a tab-delimited text file in the following format:
@@ -192,14 +218,30 @@ For the example data:
 # call 5mCs for instance
 
 # extracted-feature file as input, use CPU
-CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30
+CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s.C.features.tsv \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --nproc 30
 # extracted-feature file as input, use GPU
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s.C.features.tsv --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s.C.features.tsv \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --nproc 30 --nproc_gpu 6
 
 # fast5 files as input, use CPU
-CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30
+CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --corrected_group RawGenomeCorrected_000 \
+  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
+  --motifs C --nproc 30
 # fast5 files as input, use GPU
-CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt --result_file fast5s.C.call_mods.tsv --corrected_group RawGenomeCorrected_000 --reference_path GCF_000001735.4_TAIR10.1_genomic.fna --motifs C --nproc 30 --nproc_gpu 6
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --corrected_group RawGenomeCorrected_000 \
+  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
+  --motifs C --nproc 30 --nproc_gpu 6
 ```
 
 The modification_call file is a tab-delimited text file in the following format:
@@ -220,11 +262,14 @@ A modification-frequency file can be generated by `call_freq` function with the 
 # call 5mCs for instance
 
 # output in tsv format
-deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.tsv
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv \
+  --result_file fast5s.C.call_mods.frequency.tsv
 # output in bedMethyl format
-deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.bed --bed
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv \
+  --result_file fast5s.C.call_mods.frequency.bed --bed
 # use --sort to sort the results
-deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv --result_file fast5s.C.call_mods.frequency.bed --bed --sort
+deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv \
+  --result_file fast5s.C.call_mods.frequency.bed --bed --sort
 ```
 
 The modification_frequency file can be either saved in [bedMethyl](https://www.encodeproject.org/data-standards/wgbs/) format (by setting `--bed` as above), or saved as a tab-delimited text file in the following format by default:

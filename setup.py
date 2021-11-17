@@ -48,6 +48,10 @@ def read(*parts):
 long_description = read('README.rst')
 
 
+with open('requirements.txt', 'r') as rf:
+    required = rf.read().splitlines()
+
+
 setup(
     name='deepsignal-plant',
     packages=['deepsignal_plant'],
@@ -59,13 +63,13 @@ setup(
     author='Peng Ni',
     # tests_require=['pytest'],
     # which package needs 'future' package?
-    # TODO: make requires as reading requirements.txt
-    install_requires=['numpy>=1.15.3',
-                      'h5py>=2.8.0',
-                      'statsmodels>=0.9.0',
-                      'scikit-learn>=0.20.1',
-                      'torch>=1.2.0,<=1.6.0',
-                      ],
+    # install_requires=['numpy>=1.15.3',
+    #                   'h5py>=2.8.0',
+    #                   'statsmodels>=0.9.0',
+    #                   'scikit-learn>=0.20.1',
+    #                   'torch>=1.2.0,<=1.7.0',
+    #                   ],
+    install_requires=required,
     # cmdclass={'test': PyTest},
     author_email='543943952@qq.com',
     description='A deep-learning method for detecting DNA methylation state '
