@@ -16,6 +16,7 @@ from .utils.txt_formater import split_key
 
 import multiprocessing as mp
 from .utils.process_utils import MyQueue as Queue
+import uuid
 
 time_wait = 3
 
@@ -30,6 +31,9 @@ def calculate_mods_frequency(mods_files, prob_cf, contig_name=None):
     """
     sitekeys = set()
     sitekey2stats = dict()
+
+    if type(mods_files) is str:
+        mods_files = [mods_files, ]
 
     count, used = 0, 0
     for mods_file in mods_files:
@@ -106,7 +110,28 @@ def _read_file_lines(cfile):
         return rf.read().splitlines()
 
 
-def _call_and_write_modsfreq_process(mods_files, prob_cf, result_file, issort, isbed, contigs_q, resfiles_q):
+def _get_contigfile_name(wprefix, contig):
+    return wprefix + "." + contig + ".txt"
+
+
+def _split_file_by_contignames(mods_files, wprefix, contigs):
+    contigs = set(contigs)
+    wfs = {}
+    for contig in contigs:
+        wfs[contig] = open(_get_contigfile_name(wprefix, contig), "w")
+    for input_file in mods_files:
+        with open(input_file, "r") as rf:
+            for line in rf:
+                chrom = line.strip().split("\t")[0]
+                if chrom not in contigs:
+                    continue
+                wfs[chrom].write(line)
+    for contig in contigs:
+        wfs[contig].flush()
+        wfs[contig].close()
+
+
+def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbed, contigs_q, resfiles_q):
     print("process-{} -- starts".format(os.getpid()))
     while True:
         if contigs_q.empty():
@@ -116,13 +141,15 @@ def _call_and_write_modsfreq_process(mods_files, prob_cf, result_file, issort, i
             contigs_q.put("kill")
             break
         print("process-{} for contig-{} -- reading the input files..".format(os.getpid(), contig_name))
-        sites_stats = calculate_mods_frequency(mods_files, prob_cf, contig_name)
+        input_file = _get_contigfile_name(wprefix, contig_name)
+        sites_stats = calculate_mods_frequency(input_file, prob_cf, contig_name)
         print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
         fname, fext = os.path.splitext(result_file)
-        c_result_file = fname + "." + contig_name + fext
+        c_result_file = fname + "." + contig_name + "." + str(uuid.uuid1()) + fext
         write_sitekey2stats(sites_stats, c_result_file, issort, isbed)
         resfiles_q.put(c_result_file)
-    print("process-{} -- ending".format(os.getpid()))
+        os.remove(input_file)
+    print("process-{} -- ends".format(os.getpid()))
 
 
 def _concat_contig_results(contig_files, result_file):
@@ -170,12 +197,16 @@ def call_mods_frequency_to_file(args):
             contigs = sorted(list(set(args.contigs.strip().split(","))))
 
     if contigs is None:
-        print("reading the input files..")
+        print("read the input files..")
         sites_stats = calculate_mods_frequency(mods_files, prob_cf)
-        print("writing the result..")
+        print("write the result..")
         write_sitekey2stats(sites_stats, result_file, issort, isbed)
     else:
-        print("starting processing {} contigs..".format(len(contigs)))
+        print("start processing {} contigs..".format(len(contigs)))
+        wprefix = os.path.dirname(os.path.abspath(result_file)) + "/tmp." + str(uuid.uuid1())
+        print("generate input files for each contig..")
+        _split_file_by_contignames(mods_files, wprefix, contigs)
+        print("read the input files of each contig..")
         contigs_q = Queue()
         for contig in contigs:
             contigs_q.put(contig)
@@ -184,7 +215,7 @@ def call_mods_frequency_to_file(args):
         procs_contig = []
         for _ in range(args.nproc):
             p_contig = mp.Process(target=_call_and_write_modsfreq_process,
-                                  args=(mods_files, prob_cf, result_file, issort, isbed,
+                                  args=(wprefix, prob_cf, result_file, issort, isbed,
                                         contigs_q, resfiles_q))
             p_contig.daemon = True
             p_contig.start()
@@ -202,7 +233,7 @@ def call_mods_frequency_to_file(args):
             assert len(contigs) == len(resfiles_cs)
         except AssertionError:
             print("!!!Please check the result files -- seems not all inputed contigs have result")
-        print("combining results of {} contigs..".format(len(resfiles_cs)))
+        print("combine results of {} contigs..".format(len(resfiles_cs)))
         _concat_contig_results(resfiles_cs, result_file)
     print("[main]call_freq costs %.1f seconds.." % (time.time() - start))
 
