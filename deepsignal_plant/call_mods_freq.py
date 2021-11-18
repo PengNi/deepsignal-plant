@@ -14,12 +14,18 @@ from .utils.txt_formater import ModRecord
 from .utils.txt_formater import SiteStats
 from .utils.txt_formater import split_key
 
+import multiprocessing as mp
+from .utils.process_utils import MyQueue as Queue
 
-def calculate_mods_frequency(mods_files, prob_cf):
+time_wait = 3
+
+
+def calculate_mods_frequency(mods_files, prob_cf, contig_name=None):
     """
     call mod_freq from call_mods files
     :param mods_files: a list of call_mods files
     :param prob_cf:
+    :param contig_name:
     :return: key2value obj
     """
     sitekeys = set()
@@ -31,6 +37,8 @@ def calculate_mods_frequency(mods_files, prob_cf):
             for line in rf:
                 words = line.strip().split("\t")
                 mod_record = ModRecord(words)
+                if contig_name is not None and mod_record._chromosome != contig_name:
+                    continue
                 if mod_record.is_record_callable(prob_cf):
                     if mod_record._site_key not in sitekeys:
                         sitekeys.add(mod_record._site_key)
@@ -46,7 +54,10 @@ def calculate_mods_frequency(mods_files, prob_cf):
                         sitekey2stats[mod_record._site_key]._unmet += 1
                     used += 1
                 count += 1
-    print("{:.2f}% ({} of {}) calls used..".format(used/float(count) * 100, used, count))
+    if contig_name is None:
+        print("{:.2f}% ({} of {}) calls used..".format(used/float(count) * 100, used, count))
+    else:
+        print("{:.2f}% ({} of {}) calls used for {}..".format(used / float(count) * 100, used, count, contig_name))
     return sitekey2stats
 
 
@@ -90,6 +101,41 @@ def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
                 print("{} {} has no coverage..".format(chrom, pos))
 
 
+def _read_file_lines(cfile):
+    with open(cfile, "r") as rf:
+        return rf.read().splitlines()
+
+
+def _call_and_write_modsfreq_process(mods_files, prob_cf, result_file, issort, isbed, contigs_q, resfiles_q):
+    print("process-{} -- starts".format(os.getpid()))
+    while True:
+        if contigs_q.empty():
+            time.sleep(time_wait)
+        contig_name = contigs_q.get()
+        if contig_name == "kill":
+            contigs_q.put("kill")
+            break
+        print("process-{} for contig-{} -- reading the input files..".format(os.getpid(), contig_name))
+        sites_stats = calculate_mods_frequency(mods_files, prob_cf, contig_name)
+        print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
+        fname, fext = os.path.splitext(result_file)
+        c_result_file = fname + "." + contig_name + fext
+        write_sitekey2stats(sites_stats, c_result_file, issort, isbed)
+        resfiles_q.put(c_result_file)
+    print("process-{} -- ending".format(os.getpid()))
+
+
+def _concat_contig_results(contig_files, result_file):
+    wf = open(result_file, "w")
+    for cfile in sorted(contig_files):
+        with open(cfile, 'r') as rf:
+            for line in rf:
+                wf.write(line)
+        os.remove(cfile)
+    wf.flush()
+    wf.close()
+
+
 def call_mods_frequency_to_file(args):
     print("[main]call_freq starts..")
     start = time.time()
@@ -116,10 +162,44 @@ def call_mods_frequency_to_file(args):
             raise ValueError()
     print("get {} input file(s)..".format(len(mods_files)))
 
-    print("reading the input files..")
-    sites_stats = calculate_mods_frequency(mods_files, prob_cf)
-    print("writing the result..")
-    write_sitekey2stats(sites_stats, result_file, issort, isbed)
+    contigs = None
+    if args.contigs is not None:
+        if os.path.isfile(args.contigs):
+            contigs = sorted(list(set(_read_file_lines(args.contigs))))
+        else:
+            contigs = sorted(list(set(args.contigs.strip().split(","))))
+
+    if contigs is None:
+        print("reading the input files..")
+        sites_stats = calculate_mods_frequency(mods_files, prob_cf)
+        print("writing the result..")
+        write_sitekey2stats(sites_stats, result_file, issort, isbed)
+    else:
+        print("starting processing {} contigs..".format(len(contigs)))
+        contigs_q = Queue()
+        for contig in contigs:
+            contigs_q.put(contig)
+        contigs_q.put("kill")
+        resfiles_q = Queue()
+        procs_contig = []
+        for _ in range(args.nproc):
+            p_contig = mp.Process(target=_call_and_write_modsfreq_process,
+                                  args=(mods_files, prob_cf, result_file, issort, isbed,
+                                        contigs_q, resfiles_q))
+            p_contig.daemon = True
+            p_contig.start()
+            procs_contig.append(p_contig)
+        resfiles_cs = []
+        while True:
+            running = any(p.is_alive() for p in procs_contig)
+            while not resfiles_q.empty():
+                resfiles_cs.append(resfiles_q.get())
+            if not running:
+                break
+        for p in procs_contig:
+            p.join()
+        print("combining results of {} contigs..".format(len(contigs)))
+        _concat_contig_results(resfiles_cs, result_file)
     print("[main]call_freq costs %.1f seconds.." % (time.time() - start))
 
 
@@ -135,6 +215,15 @@ def main():
 
     parser.add_argument('--result_file', '-o', action="store", type=str, required=True,
                         help='the file path to save the result')
+
+    parser.add_argument('--contigs', action="store", type=str, required=False, default=None,
+                        help="path of a file contains chromosome/contig names, one name each line; "
+                             "or a string contains multiple chromosome names splited by comma. "
+                             "default None, which means all chromosomes will be processed at one time. "
+                             "If not None, one chromosome will be processed by one subprocess.")
+    parser.add_argument('--nproc', action="store", type=int, required=False, default=1,
+                        help="number of subprocesses used when --contigs is set. i.e., number of contigs processed "
+                             "in parallel. default 1")
 
     parser.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
     parser.add_argument('--sort', action='store_true', default=False, help="sort items in the result")

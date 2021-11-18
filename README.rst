@@ -8,6 +8,7 @@ Release
 
 0.1.4
 -----
+modify *call_freq* module for large genomes
 
 
 

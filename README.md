@@ -296,7 +296,9 @@ A new model can be trained as follows:
 ```bash
 # need to split training samples to two independent datasets for training and validating
 # please use deepsignal_plant train -h/--help for instructions
-deepsignal_plant train --train_file /path/to/train/file --valid_file /path/to/valid/file --model_dir /dir/to/save/the/new/model
+deepsignal_plant train --train_file /path/to/train/file \
+  --valid_file /path/to/valid/file \
+  --model_dir /dir/to/save/the/new/model
 ```
 
 

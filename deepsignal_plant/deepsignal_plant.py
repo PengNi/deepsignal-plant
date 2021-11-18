@@ -460,6 +460,16 @@ def main():
                               'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
                               'means use all calls. range [0, 1], default 0.5.')
 
+    scf_para = sub_call_freq.add_argument_group("PARALLEL")
+    scf_para.add_argument('--contigs', action="store", type=str, required=False, default=None,
+                          help="path of a file contains chromosome/contig names, one name each line; "
+                               "or a string contains multiple chromosome names splited by comma. "
+                               "default None, which means all chromosomes will be processed at one time. "
+                               "If not None, one chromosome will be processed by one subprocess.")
+    scf_para.add_argument('--nproc', action="store", type=int, required=False, default=1,
+                          help="number of subprocesses used when --contigs is set. i.e., number of contigs processed "
+                               "in parallel. default 1")
+
     sub_call_freq.set_defaults(func=main_call_freq)
 
     args = parser.parse_args()
