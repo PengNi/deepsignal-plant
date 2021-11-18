@@ -16,6 +16,7 @@ from .utils.txt_formater import split_key
 
 import multiprocessing as mp
 from .utils.process_utils import MyQueue as Queue
+from .utils.process_utils import is_file_empty
 import uuid
 
 time_wait = 3
@@ -142,12 +143,18 @@ def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbe
             break
         print("process-{} for contig-{} -- reading the input files..".format(os.getpid(), contig_name))
         input_file = _get_contigfile_name(wprefix, contig_name)
-        sites_stats = calculate_mods_frequency(input_file, prob_cf, contig_name)
-        print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
-        fname, fext = os.path.splitext(result_file)
-        c_result_file = fname + "." + contig_name + "." + str(uuid.uuid1()) + fext
-        write_sitekey2stats(sites_stats, c_result_file, issort, isbed)
-        resfiles_q.put(c_result_file)
+        if not os.path.isfile(input_file):
+            print("process-{} for contig-{} -- the file does not exist..".format(os.getpid(), contig_name))
+            continue
+        if is_file_empty(input_file):
+            print("process-{} for contig-{} -- the file is empty..".format(os.getpid(), contig_name))
+        else:
+            sites_stats = calculate_mods_frequency(input_file, prob_cf, contig_name)
+            print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
+            fname, fext = os.path.splitext(result_file)
+            c_result_file = fname + "." + contig_name + "." + str(uuid.uuid1()) + fext
+            write_sitekey2stats(sites_stats, c_result_file, issort, isbed)
+            resfiles_q.put(c_result_file)
         os.remove(input_file)
     print("process-{} -- ends".format(os.getpid()))
 
@@ -232,7 +239,7 @@ def call_mods_frequency_to_file(args):
         try:
             assert len(contigs) == len(resfiles_cs)
         except AssertionError:
-            print("!!!Please check the result files -- seems not all inputed contigs have result")
+            print("!!!Please check the result files -- seems not all inputed contigs have result!!!")
         print("combine results of {} contigs..".format(len(resfiles_cs)))
         _concat_contig_results(resfiles_cs, result_file)
     print("[main]call_freq costs %.1f seconds.." % (time.time() - start))

@@ -181,15 +181,23 @@ def parse_region_str(regionstr):
         raise ValueError("--region not set right!")
 
 
+# https://thispointer.com/python-three-ways-to-check-if-a-file-is-empty/
+def is_file_empty(file_name):
+    """ Check if file is empty by confirming if its size is 0 bytes"""
+    # Check if file exist and it is empty
+    return os.path.isfile(file_name) and os.path.getsize(file_name) == 0
+
+
 # functions for combining files and random sampling lines of txt files ================
-def count_line_num(sl_filepath, fheader=False):
+def count_line_num(sl_filepath, fheader=False, printlog=True):
     count = 0
     with open(sl_filepath, 'r') as rf:
         if fheader:
             next(rf)
         for _ in rf:
             count += 1
-    print('done count the lines of file {}'.format(sl_filepath))
+    if printlog:
+        print('done count the lines of file {}'.format(sl_filepath))
     return count
 
 
