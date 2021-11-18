@@ -144,10 +144,10 @@ def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbe
         print("process-{} for contig-{} -- reading the input files..".format(os.getpid(), contig_name))
         input_file = _get_contigfile_name(wprefix, contig_name)
         if not os.path.isfile(input_file):
-            print("process-{} for contig-{} -- the file does not exist..".format(os.getpid(), contig_name))
+            print("process-{} for contig-{} -- the input file does not exist..".format(os.getpid(), contig_name))
             continue
         if is_file_empty(input_file):
-            print("process-{} for contig-{} -- the file is empty..".format(os.getpid(), contig_name))
+            print("process-{} for contig-{} -- the input file is empty..".format(os.getpid(), contig_name))
         else:
             sites_stats = calculate_mods_frequency(input_file, prob_cf, contig_name)
             print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
