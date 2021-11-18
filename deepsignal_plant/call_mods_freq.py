@@ -198,7 +198,11 @@ def call_mods_frequency_to_file(args):
                 break
         for p in procs_contig:
             p.join()
-        print("combining results of {} contigs..".format(len(contigs)))
+        try:
+            assert len(contigs) == len(resfiles_cs)
+        except AssertionError:
+            print("!!!Please check the result files -- seems not all inputed contigs have result")
+        print("combining results of {} contigs..".format(len(resfiles_cs)))
         _concat_contig_results(resfiles_cs, result_file)
     print("[main]call_freq costs %.1f seconds.." % (time.time() - start))
 
