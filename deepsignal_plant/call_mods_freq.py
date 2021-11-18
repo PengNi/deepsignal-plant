@@ -159,7 +159,7 @@ def call_mods_frequency_to_file(args):
         elif os.path.isfile(input_path):
             mods_files.append(input_path)
         else:
-            raise ValueError()
+            raise ValueError("--input_path is not a file or a directory!")
     print("get {} input file(s)..".format(len(mods_files)))
 
     contigs = None
