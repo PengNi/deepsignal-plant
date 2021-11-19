@@ -48,7 +48,7 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
     :return: raw signals, event table
     """
     try:
-        fast5_data = h5py.File(fast5_fn, 'r')
+        fast5_data = h5py.File(fast5_fn, mode='r')
     except IOError:
         raise IOError('Error opening file. Likely a corrupted file.')
 
@@ -59,14 +59,16 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
         # raw_dat = raw_dat['Signal'].value
         raw_dat = raw_dat['Signal'][()]
     except Exception:
+        fast5_data.close()
         raise RuntimeError('Raw data is not stored in Raw/Reads/Read_[read#] so '
                            'new segments cannot be identified.')
 
     # Get Events
     try:
-        event = fast5_data['/Analyses/'+correct_group + '/' + correct_subgroup + '/Events']
+        event = fast5_data['Analyses/' + correct_group + '/' + correct_subgroup + '/Events']
         # print(event)
     except Exception:
+        fast5_data.close()
         raise RuntimeError('events not found.')
 
     try:
@@ -75,15 +77,15 @@ def _get_label_raw(fast5_fn, correct_group, correct_subgroup):
         # print('read_start_rel_to_raw: ',read_start_rel_to_raw)
         starts = list(map(lambda x: x + read_start_rel_to_raw, event['start']))
     except KeyError:
-        # starts = list(map(lambda x: x, event['start']))
+        fast5_data.close()
         raise KeyError('no read_start_rel_to_raw in event attributes')
 
-    starts = list(map(lambda x: x+read_start_rel_to_raw, event['start']))
     lengths = event['length'].astype(np.int)
     base = [x.decode("UTF-8") for x in event['base']]
     assert len(starts) == len(lengths)
     assert len(lengths) == len(base)
     events = list(zip(starts, lengths, base))
+    fast5_data.close()
     return raw_dat, events
 
 
@@ -107,14 +109,16 @@ def _get_alignment_attrs_of_each_strand(strand_path, h5obj):
             alignstrand = str(alignment_attrs['mapped_strand'], 'utf-8')
             chrom = str(alignment_attrs['mapped_chrom'], 'utf-8')
         except TypeError:
-            alignstrand = str(alignment_attrs['mapped_strand'])
-            chrom = str(alignment_attrs['mapped_chrom'])
-            if chrom.startswith('b'):
+            alignstrand = alignment_attrs['mapped_strand']
+            alignstrand = str(alignstrand) if type(alignstrand) is not str else alignstrand
+            chrom = alignment_attrs['mapped_chrom']
+            chrom = str(chrom) if type(chrom) is not str else chrom
+            if chrom.startswith("b'"):
                 chrom = chrom.split("'")[1]
     else:
         alignstrand = str(alignment_attrs['mapped_strand'])
         chrom = str(alignment_attrs['mapped_chrom'])
-        if chrom.startswith('b'):
+        if chrom.startswith("b'"):
             chrom = chrom.split("'")[1]
     chrom_start = alignment_attrs['mapped_start']
 
@@ -158,7 +162,6 @@ def _get_alignment_info_from_fast5(fast5_path, corrected_group='RawGenomeCorrect
             strand, alignstrand, chrom, chrom_start = _get_alignment_attrs_of_each_strand('/'.join([corrgroup_path,
                                                                                                     basecall_subgroup]),
                                                                                           h5file)
-
             h5file.close()
             return readname, strand, alignstrand, chrom, chrom_start
         else:
