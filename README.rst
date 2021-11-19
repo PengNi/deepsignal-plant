@@ -8,7 +8,9 @@ Release
 
 0.1.4
 -----
-modify *call_freq* module for large genomes
+modify *call_freq* module for large genomes,
+
+fix bug of extrating contig name from fast5s
 
 
 

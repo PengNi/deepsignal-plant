@@ -112,13 +112,16 @@ def _get_alignment_attrs_of_each_strand(strand_path, h5obj):
             alignstrand = alignment_attrs['mapped_strand']
             alignstrand = str(alignstrand) if type(alignstrand) is not str else alignstrand
             chrom = alignment_attrs['mapped_chrom']
-            chrom = str(chrom) if type(chrom) is not str else chrom
-            if chrom.startswith("b'"):
+            chrom_val_type = type(chrom)
+            chrom = str(chrom) if chrom_val_type is not str else chrom
+            if chrom_val_type is bytes and chrom.startswith("b'"):
                 chrom = chrom.split("'")[1]
     else:
         alignstrand = str(alignment_attrs['mapped_strand'])
-        chrom = str(alignment_attrs['mapped_chrom'])
-        if chrom.startswith("b'"):
+        chrom = alignment_attrs['mapped_chrom']
+        chrom_val_type = type(chrom)
+        chrom = str(chrom) if chrom_val_type is not str else chrom
+        if chrom_val_type is bytes and chrom.startswith("b'"):
             chrom = chrom.split("'")[1]
     chrom_start = alignment_attrs['mapped_start']
 
