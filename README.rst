@@ -4,6 +4,10 @@ deepsignal-plant
 
 Release
 -------
+0.1.5
+-----
+make sure results of each read be written together in call_mods' output
+
 
 
 0.1.4
