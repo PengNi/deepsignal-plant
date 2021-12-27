@@ -139,7 +139,6 @@ CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ \
   --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
   --result_file fast5s.C.call_mods.tsv \
   --corrected_group RawGenomeCorrected_000 \
-  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
   --motifs C --nproc 30 --nproc_gpu 6
 deepsignal_plant call_freq --input_path fast5s.C.call_mods.tsv \
   --result_file fast5s.C.call_mods.frequency.tsv
@@ -190,7 +189,7 @@ Features of targeted sites can be extracted for training or testing.
 For the example data (By default, deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
 ```bash
 # extract features of all Cs
-deepsignal_plant extract -i fast5s --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
+deepsignal_plant extract -i fast5s \
   -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 \
   --nproc 30 --motifs C
 ```
@@ -199,7 +198,7 @@ The extracted_features file is a tab-delimited text file in the following format
    - **chrom**: the chromosome name
    - **pos**:   0-based position of the targeted base in the chromosome
    - **strand**:    +/-, the aligned strand of the read to the reference
-   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome
+   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome (_legacy column, not necessary for downstream analysis_)
    - **readname**:  the read name
    - **read_strand**:   t/c, template or complement
    - **k_mer**: the sequence around the targeted base
@@ -233,14 +232,12 @@ CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ \
   --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
   --result_file fast5s.C.call_mods.tsv \
   --corrected_group RawGenomeCorrected_000 \
-  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
   --motifs C --nproc 30
 # fast5 files as input, use GPU
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ \
   --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
   --result_file fast5s.C.call_mods.tsv \
   --corrected_group RawGenomeCorrected_000 \
-  --reference_path GCF_000001735.4_TAIR10.1_genomic.fna \
   --motifs C --nproc 30 --nproc_gpu 6
 ```
 
@@ -248,7 +245,7 @@ The modification_call file is a tab-delimited text file in the following format:
    - **chrom**: the chromosome name
    - **pos**:   0-based position of the targeted base in the chromosome
    - **strand**:    +/-, the aligned strand of the read to the reference
-   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome
+   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome (_legacy column, not necessary for downstream analysis_)
    - **readname**:  the read name
    - **read_strand**:   t/c, template or complement
    - **prob_0**:    [0, 1], the probability of the targeted base predicted as 0 (unmethylated)
@@ -276,7 +273,7 @@ The modification_frequency file can be either saved in [bedMethyl](https://www.e
    - **chrom**: the chromosome name
    - **pos**:   0-based position of the targeted base in the chromosome
    - **strand**:    +/-, the aligned strand of the read to the reference
-   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome
+   - **pos_in_strand**: 0-based position of the targeted base in the aligned strand of the chromosome (_legacy column, not necessary for downstream analysis_)
    - **prob_0_sum**:    sum of the probabilities of the targeted base predicted as 0 (unmethylated)
    - **prob_1_sum**:    sum of the probabilities of the targeted base predicted as 1 (methylated)
    - **count_modified**:    number of reads in which the targeted base counted as modified

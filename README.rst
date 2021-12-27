@@ -8,6 +8,7 @@ Release
 -----
 make sure results of each read be written together in call_mods' output
 
+make `--reference_path` not a required input in *extract* and *call_mods* module
 
 
 0.1.4
