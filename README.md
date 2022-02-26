@@ -16,7 +16,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 #### Known issues
 - The VBZ compression issue is not completely solved yet. Please try the commands listed below, normally it will work after setting `HDF5_PLUGIN_PATH`:
 ```shell
-# 1. install hdf5/hdf5-tools
+# 1. install hdf5/hdf5-tools (maybe not necessary)
 # ubuntu
 sudo apt-get install libhdf5-serial-dev hdf5-tools
 # centos
@@ -41,15 +41,15 @@ References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [to
 
 ## Installation
 deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [Guppy](https://nanoporetech.com/community) and [tombo](https://github.com/nanoporetech/tombo) are required to basecall and re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
-   - Prerequisites:\
+   - Prerequisites: \
        [Python3.*](https://www.python.org/) (version>=3.6)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
-   - Dependencies:\
-       [numpy](http://www.numpy.org/)\
-       [h5py](https://github.com/h5py/h5py)\
-       [statsmodels](https://github.com/statsmodels/statsmodels/)\
-       [scikit-learn](https://scikit-learn.org/stable/)\
+   - Dependencies: \
+       [numpy](http://www.numpy.org/) \
+       [h5py](https://github.com/h5py/h5py) \
+       [statsmodels](https://github.com/statsmodels/statsmodels/) \
+       [scikit-learn](https://scikit-learn.org/stable/) \
        [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.7.0?)
 
 #### 1. Create an environment
@@ -153,7 +153,7 @@ python /path/to/deepsignal_plant/scripts/split_freq_file_by_5mC_motif.py \
 Before running deepsignal, the raw reads should be basecalled by [Guppy (version>=3.6.1)](https://nanoporetech.com/community) and then be processed by the *re-squiggle* module of [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo).
 
 Note:
-- If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using Guppy/tombo (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
+- If the fast5 files are in multi-read FAST5 format, please use _multi_to_single_fast5_ command from the [ont_fast5_api package](https://github.com/nanoporetech/ont_fast5_api) to convert the fast5 files before using [Guppy](https://nanoporetech.com/community) and [tombo](https://nanoporetech.com/community) (Ref to [issue #173](https://github.com/nanoporetech/tombo/issues/173) in [tombo](https://github.com/nanoporetech/tombo)).
 ```bash
 multi_to_single_fast5 -i $multi_read_fast5_dir -s $single_read_fast5_dir -t 30 --recursive
 ```
