@@ -211,7 +211,7 @@ def main():
                           required=True,
                           help="the input path, can be a signal_feature file from extract_features.py, "
                                "or a directory of fast5 files. If a directory of fast5 files is provided, "
-                               "args in FAST5_EXTRACTION should (reference_path must) be provided.")
+                               "args in FAST5_EXTRACTION should be provided.")
     sc_input.add_argument("--f5_batch_size", action="store", type=int, default=30,
                           required=False,
                           help="number of reads/files to be processed by each process one time, default 30")
@@ -462,8 +462,10 @@ def main():
 
     scf_para = sub_call_freq.add_argument_group("PARALLEL")
     scf_para.add_argument('--contigs', action="store", type=str, required=False, default=None,
-                          help="path of a file contains chromosome/contig names, one name each line; "
-                               "or a string contains multiple chromosome names splited by comma. "
+                          help="a reference genome file (.fa/.fasta/.fna), used for extracting all "
+                               "contig names for parallel; "
+                               "or path of a file containing chromosome/contig names, one name each line; "
+                               "or a string contains multiple chromosome names splited by comma."
                                "default None, which means all chromosomes will be processed at one time. "
                                "If not None, one chromosome will be processed by one subprocess.")
     scf_para.add_argument('--nproc', action="store", type=int, required=False, default=1,

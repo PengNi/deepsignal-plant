@@ -518,10 +518,10 @@ def _extract_preprocess_(motifs, is_dna, reference_path, position_file, regionst
     print("parse the motifs string..")
     motif_seqs = get_motif_seqs(motifs, is_dna)
 
-    print("read genome reference file..")
     if reference_path is None:
         chrom2len = None
     else:
+        print("read genome reference file..")
         chrom2len = get_contig2len(reference_path)
 
     positions = None

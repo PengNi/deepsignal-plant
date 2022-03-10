@@ -695,7 +695,7 @@ def main():
                          required=True,
                          help="the input path, can be a signal_feature file from extract_features.py, "
                               "or a directory of fast5 files. If a directory of fast5 files is provided, "
-                              "args in FAST5_EXTRACTION should (reference_path must) be provided.")
+                              "args in FAST5_EXTRACTION should be provided.")
     p_input.add_argument("--f5_batch_size", action="store", type=int, default=30,
                          required=False,
                          help="number of reads/files to be processed by each process one time, default 30")

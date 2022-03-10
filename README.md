@@ -164,7 +164,7 @@ For the example data:
 # 1. run multi_to_single_fast5 if needed
 multi_to_single_fast5 -i $multi_read_fast5_dir -s $single_read_fast5_dir -t 30 --recursive
 
-# 2. basecall using GPU, fast5s is the $single_read_fast5_dir
+# 2. basecall using GPU, fast5s/ is the $single_read_fast5_dir
 guppy_basecaller -i fast5s/ -r -s fast5s_guppy \
   --config dna_r9.4.1_450bps_hac_prom.cfg \
   --device CUDA:0
@@ -301,6 +301,9 @@ deepsignal_plant train --train_file /path/to/train/file \
   --model_dir /dir/to/save/the/new/model
 ```
 
+Extra
+=====
+We are testing deepsignal-plant on a zebrafish sample...
 
 License
 =========

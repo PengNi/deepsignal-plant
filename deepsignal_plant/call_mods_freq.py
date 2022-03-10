@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import argparse
 import os
 import sys
+import gzip
 import time
 
 from .utils.txt_formater import ModRecord
@@ -38,27 +39,31 @@ def calculate_mods_frequency(mods_files, prob_cf, contig_name=None):
 
     count, used = 0, 0
     for mods_file in mods_files:
-        with open(mods_file, 'r') as rf:
-            for line in rf:
-                words = line.strip().split("\t")
-                mod_record = ModRecord(words)
-                if contig_name is not None and mod_record._chromosome != contig_name:
-                    continue
-                if mod_record.is_record_callable(prob_cf):
-                    if mod_record._site_key not in sitekeys:
-                        sitekeys.add(mod_record._site_key)
-                        sitekey2stats[mod_record._site_key] = SiteStats(mod_record._strand,
-                                                                        mod_record._pos_in_strand,
-                                                                        mod_record._kmer)
-                    sitekey2stats[mod_record._site_key]._prob_0 += mod_record._prob_0
-                    sitekey2stats[mod_record._site_key]._prob_1 += mod_record._prob_1
-                    sitekey2stats[mod_record._site_key]._coverage += 1
-                    if mod_record._called_label == 1:
-                        sitekey2stats[mod_record._site_key]._met += 1
-                    else:
-                        sitekey2stats[mod_record._site_key]._unmet += 1
-                    used += 1
-                count += 1
+        if mods_file.endswith(".gz"):
+            infile = gzip.open(mods_file, 'rt')
+        else:
+            infile = open(mods_file, 'r')
+        for line in infile:
+            words = line.strip().split("\t")
+            mod_record = ModRecord(words)
+            if contig_name is not None and mod_record._chromosome != contig_name:
+                continue
+            if mod_record.is_record_callable(prob_cf):
+                if mod_record._site_key not in sitekeys:
+                    sitekeys.add(mod_record._site_key)
+                    sitekey2stats[mod_record._site_key] = SiteStats(mod_record._strand,
+                                                                    mod_record._pos_in_strand,
+                                                                    mod_record._kmer)
+                sitekey2stats[mod_record._site_key]._prob_0 += mod_record._prob_0
+                sitekey2stats[mod_record._site_key]._prob_1 += mod_record._prob_1
+                sitekey2stats[mod_record._site_key]._coverage += 1
+                if mod_record._called_label == 1:
+                    sitekey2stats[mod_record._site_key]._met += 1
+                else:
+                    sitekey2stats[mod_record._site_key]._unmet += 1
+                used += 1
+            count += 1
+        infile.close()
     if contig_name is None:
         print("{:.2f}% ({} of {}) calls used..".format(used/float(count) * 100, used, count))
     else:
@@ -111,6 +116,26 @@ def _read_file_lines(cfile):
         return rf.read().splitlines()
 
 
+def _get_contignams_from_genome_fasta(genomefa):
+    contigs = []
+    with open(genomefa, "r") as rf:
+        for line in rf:
+            if line.startswith(">"):
+                contigname = line.strip()[1:].split(' ')[0]
+                contigs.append(contigname)
+    return contigs
+
+
+def _is_file_a_genome_fasta(contigfile):
+    with open(contigfile, "r") as rf:
+        for line in rf:
+            if line.startswith("#"):
+                continue
+            elif line.startswith(">"):
+                return True
+    return False
+
+
 def _get_contigfile_name(wprefix, contig):
     return wprefix + "." + contig + ".txt"
 
@@ -121,12 +146,16 @@ def _split_file_by_contignames(mods_files, wprefix, contigs):
     for contig in contigs:
         wfs[contig] = open(_get_contigfile_name(wprefix, contig), "w")
     for input_file in mods_files:
-        with open(input_file, "r") as rf:
-            for line in rf:
-                chrom = line.strip().split("\t")[0]
-                if chrom not in contigs:
-                    continue
-                wfs[chrom].write(line)
+        if input_file.endswith(".gz"):
+            infile = gzip.open(input_file, 'rt')
+        else:
+            infile = open(input_file, 'r')
+        for line in infile:
+            chrom = line.strip().split("\t")[0]
+            if chrom not in contigs:
+                continue
+            wfs[chrom].write(line)
+        infile.close()
     for contig in contigs:
         wfs[contig].flush()
         wfs[contig].close()
@@ -199,7 +228,12 @@ def call_mods_frequency_to_file(args):
     contigs = None
     if args.contigs is not None:
         if os.path.isfile(args.contigs):
-            contigs = sorted(list(set(_read_file_lines(args.contigs))))
+            if args.contigs.endswith(".fa") or args.contigs.endswith(".fasta") or args.contigs.endswith(".fna"):
+                contigs = _get_contignams_from_genome_fasta(args.contigs)
+            elif _is_file_a_genome_fasta(args.contigs):
+                contigs = _get_contignams_from_genome_fasta(args.contigs)
+            else:
+                contigs = sorted(list(set(_read_file_lines(args.contigs))))
         else:
             contigs = sorted(list(set(args.contigs.strip().split(","))))
 
@@ -259,8 +293,10 @@ def main():
                         help='the file path to save the result')
 
     parser.add_argument('--contigs', action="store", type=str, required=False, default=None,
-                        help="path of a file contains chromosome/contig names, one name each line; "
-                             "or a string contains multiple chromosome names splited by comma. "
+                        help="a reference genome file (.fa/.fasta/.fna), used for extracting all "
+                             "contig names for parallel; "
+                             "or path of a file containing chromosome/contig names, one name each line; "
+                             "or a string contains multiple chromosome names splited by comma."
                              "default None, which means all chromosomes will be processed at one time. "
                              "If not None, one chromosome will be processed by one subprocess.")
     parser.add_argument('--nproc', action="store", type=int, required=False, default=1,
