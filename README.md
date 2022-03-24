@@ -42,7 +42,7 @@ References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [to
 ## Installation
 deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [Guppy](https://nanoporetech.com/community) and [tombo](https://github.com/nanoporetech/tombo) are required to basecall and re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites: \
-       [Python3.*](https://www.python.org/) (version>=3.6)\
+       [Python3.*](https://www.python.org/) (version>=3.7)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
    - Dependencies: \
@@ -56,7 +56,7 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
 We highly recommend using a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
 # create
-conda create -n deepsignalpenv python=3.6
+conda create -n deepsignalpenv python=3.7
 
 # activate
 conda activate deepsignalpenv

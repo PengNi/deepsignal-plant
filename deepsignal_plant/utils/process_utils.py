@@ -23,15 +23,15 @@ basepairs_rna = {'A': 'U', 'C': 'G', 'G': 'C', 'U': 'A', 'N': 'N',
                  'Z': 'Z'}
 
 base2code_dna = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 4,
-                 'W': 4, 'S': 4, 'M': 4, 'K': 4, 'R': 4,
-                 'Y': 4, 'B': 4, 'V': 4, 'D': 4, 'H': 4,
-                 'Z': 4}  # set 4 for all bases except ACGT, for now
-code2base_dna = {0: 'A', 1: 'C', 2: 'G', 3: 'T', 4: 'N'}
+                 'W': 5, 'S': 6, 'M': 7, 'K': 8, 'R': 9,
+                 'Y': 10, 'B': 11, 'V': 12, 'D': 13, 'H': 14,
+                 'Z': 15}
+code2base_dna = dict((v, k) for k, v in base2code_dna.items())
 base2code_rna = {'A': 0, 'C': 1, 'G': 2, 'U': 3, 'N': 4,
-                 'W': 4, 'S': 4, 'M': 4, 'K': 4, 'R': 4,
-                 'Y': 4, 'B': 4, 'V': 4, 'D': 4, 'H': 4,
-                 'Z': 4}  # set 4 for all bases except ACGU, for now
-code2base_rna = {0: 'A', 1: 'C', 2: 'G', 3: 'U', 4: 'N'}
+                 'W': 5, 'S': 6, 'M': 7, 'K': 8, 'R': 9,
+                 'Y': 10, 'B': 11, 'V': 12, 'D': 13, 'H': 14,
+                 'Z': 15}
+code2base_rna = dict((v, k) for k, v in base2code_rna.items())
 
 iupac_alphabets = {'A': ['A'], 'T': ['T'], 'C': ['C'], 'G': ['G'],
                    'R': ['A', 'G'], 'M': ['A', 'C'], 'S': ['C', 'G'],
