@@ -155,8 +155,8 @@ def train(args):
                         # vprecs.append(i_precision)
                         # vrecas.append(i_recall)
                         vlosses.append(vloss.item())
-                        vlabels_total += vlabels
-                        vpredicted_total += vpredicted
+                        vlabels_total += vlabels.tolist()
+                        vpredicted_total += vpredicted.tolist()
 
                     v_accuracy = metrics.accuracy_score(vlabels_total, vpredicted_total)
                     v_precision = metrics.precision_score(vlabels_total, vpredicted_total)
