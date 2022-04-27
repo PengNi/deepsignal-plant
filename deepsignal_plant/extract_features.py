@@ -14,6 +14,8 @@ import h5py
 import random
 import numpy as np
 
+import gzip
+
 import multiprocessing as mp
 
 from .utils.process_utils import MyQueue as Queue
@@ -446,24 +448,30 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
     print("extrac_features process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
-def _write_featurestr_to_file(write_fp, featurestr_q):
+def _write_featurestr_to_file(write_fp, featurestr_q, is_gzip):
     print("write_process-{} starts".format(os.getpid()))
-    with open(write_fp, 'w') as wf:
-        while True:
-            # during test, it's ok without the sleep(time_wait)
-            if featurestr_q.empty():
-                time.sleep(time_wait)
-                continue
-            features_str = featurestr_q.get()
-            if features_str == "kill":
-                print('write_process-{} finished'.format(os.getpid()))
-                break
-            for one_features_str in features_str:
-                wf.write(one_features_str + "\n")
-            wf.flush()
+    if is_gzip:
+        if not write_fp.endswith(".gz"):
+            write_fp += ".gz"
+        wf = gzip.open(write_fp, "wt")
+    else:
+        wf = open(write_fp, 'w')
+    while True:
+        # during test, it's ok without the sleep(time_wait)
+        if featurestr_q.empty():
+            time.sleep(time_wait)
+            continue
+        features_str = featurestr_q.get()
+        if features_str == "kill":
+            wf.close()
+            print('write_process-{} finished'.format(os.getpid()))
+            break
+        for one_features_str in features_str:
+            wf.write(one_features_str + "\n")
+        wf.flush()
 
 
-def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num):
+def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num, is_gzip):
     print("write_process-{} starts".format(os.getpid()))
     if os.path.exists(write_dir):
         if os.path.isfile(write_dir):
@@ -472,7 +480,10 @@ def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num):
         os.makedirs(write_dir)
 
     file_count = 0
-    wf = open("/".join([write_dir, str(file_count) + ".tsv"]), "w")
+    if is_gzip:
+        wf = gzip.open("/".join([write_dir, str(file_count) + ".tsv.gz"]), "wt")
+    else:
+        wf = open("/".join([write_dir, str(file_count) + ".tsv"]), "w")
     batch_count = 0
     while True:
         # during test, it's ok without the sleep(time_wait)
@@ -481,6 +492,7 @@ def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num):
             continue
         features_str = featurestr_q.get()
         if features_str == "kill":
+            wf.close()
             print('write_process-{} finished'.format(os.getpid()))
             break
 
@@ -488,18 +500,21 @@ def _write_featurestr_to_dir(write_dir, featurestr_q, w_batch_num):
             wf.flush()
             wf.close()
             file_count += 1
-            wf = open("/".join([write_dir, str(file_count) + ".tsv"]), "w")
+            if is_gzip:
+                wf = gzip.open("/".join([write_dir, str(file_count) + ".tsv.gz"]), "wt")
+            else:
+                wf = open("/".join([write_dir, str(file_count) + ".tsv"]), "w")
             batch_count = 0
         for one_features_str in features_str:
             wf.write(one_features_str + "\n")
         batch_count += 1
 
 
-def _write_featurestr(write_fp, featurestr_q, w_batch_num=10000, is_dir=False):
+def _write_featurestr(write_fp, featurestr_q, w_batch_num=10000, is_dir=False, is_gzip=False):
     if is_dir:
-        _write_featurestr_to_dir(write_fp, featurestr_q, w_batch_num)
+        _write_featurestr_to_dir(write_fp, featurestr_q, w_batch_num, is_gzip)
     else:
-        _write_featurestr_to_file(write_fp, featurestr_q)
+        _write_featurestr_to_file(write_fp, featurestr_q, is_gzip)
 
 
 def _read_position_file(position_file):
@@ -575,7 +590,8 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      batch_size, write_fp, nproc,
                      corrected_group, basecall_subgroup, normalize_method,
                      motifs, methyloc, kmer_len, signals_len, methy_label,
-                     position_file, regionstr, w_is_dir, w_batch_num):
+                     position_file, regionstr, w_is_dir, w_batch_num,
+                     is_gzip):
     print("[main] extract_features starts..")
     start = time.time()
 
@@ -608,7 +624,8 @@ def extract_features(fast5_dir, is_recursive, reference_path, is_dna,
         featurestr_procs.append(p)
 
     # print("write_process started..")
-    p_w = mp.Process(target=_write_featurestr, args=(write_fp, featurestr_q, w_batch_num, w_is_dir))
+    p_w = mp.Process(target=_write_featurestr, args=(write_fp, featurestr_q, w_batch_num, w_is_dir,
+                                                     is_gzip))
     p_w.daemon = True
     p_w.start()
 
@@ -712,6 +729,8 @@ def main():
     ep_output.add_argument("--w_batch_num", action="store",
                            type=int, required=False, default=200,
                            help='features batch num to save in a single writed file when --is_dir is true')
+    ep_output.add_argument("--gzip", action="store_true", default=False, required=False,
+                           help="if compressing the output using gzip")
 
     extraction_parser.add_argument("--nproc", "-p", action="store", type=int, default=1,
                                    required=False,
@@ -747,10 +766,13 @@ def main():
     nproc = extraction_args.nproc
     f5_batch_size = extraction_args.f5_batch_size
 
+    is_gzip = extraction_args.gzip
+
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
                      normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
-                     position_file, regionstr, w_is_dir, w_batch_num)
+                     position_file, regionstr, w_is_dir, w_batch_num,
+                     is_gzip)
 
 
 if __name__ == '__main__':

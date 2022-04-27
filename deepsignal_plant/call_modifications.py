@@ -14,6 +14,8 @@ import sys
 import numpy as np
 from sklearn import metrics
 
+import gzip
+
 # import multiprocessing as mp
 import torch.multiprocessing as mp
 
@@ -57,18 +59,51 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
     """
     print("read_features process-{} starts".format(os.getpid()))
     r_num, b_num = 0, 0
-    with open(features_file, "r") as rf:
-        sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
-        kmers = []
-        base_means = []
-        base_stds = []
-        base_signal_lens = []
-        k_signals = []
-        labels = []
 
-        line = next(rf)
+    if features_file.endswith(".gz"):
+        infile = gzip.open(features_file, 'rt')
+    else:
+        infile = open(features_file, 'r')
+
+    sampleinfo = []  # contains: chromosome, pos, strand, pos_in_strand, read_name, read_strand
+    kmers = []
+    base_means = []
+    base_stds = []
+    base_signal_lens = []
+    k_signals = []
+    labels = []
+
+    line = next(infile)
+    words = line.strip().split("\t")
+    readid_pre = words[4]
+
+    sampleinfo.append("\t".join(words[0:6]))
+    kmers.append([base2code_dna[x] for x in words[6]])
+    base_means.append([float(x) for x in words[7].split(",")])
+    base_stds.append([float(x) for x in words[8].split(",")])
+    base_signal_lens.append([int(x) for x in words[9].split(",")])
+    k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
+    labels.append(int(words[11]))
+
+    for line in infile:
         words = line.strip().split("\t")
-        readid_pre = words[4]
+        readidtmp = words[4]
+        if readidtmp != readid_pre:
+            r_num += 1
+            readid_pre = readidtmp
+            if r_num % f5_batch_size == 0:
+                features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
+                                      base_signal_lens, k_signals, labels))
+                while features_batch_q.qsize() > queen_size_border_f5batch:
+                    time.sleep(time_wait)
+                sampleinfo = []
+                kmers = []
+                base_means = []
+                base_stds = []
+                base_signal_lens = []
+                k_signals = []
+                labels = []
+                b_num += 1
 
         sampleinfo.append("\t".join(words[0:6]))
         kmers.append([base2code_dna[x] for x in words[6]])
@@ -77,39 +112,12 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
         base_signal_lens.append([int(x) for x in words[9].split(",")])
         k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
         labels.append(int(words[11]))
-
-        for line in rf:
-            words = line.strip().split("\t")
-            readidtmp = words[4]
-            if readidtmp != readid_pre:
-                r_num += 1
-                readid_pre = readidtmp
-                if r_num % f5_batch_size == 0:
-                    features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
-                                          base_signal_lens, k_signals, labels))
-                    while features_batch_q.qsize() > queen_size_border_f5batch:
-                        time.sleep(time_wait)
-                    sampleinfo = []
-                    kmers = []
-                    base_means = []
-                    base_stds = []
-                    base_signal_lens = []
-                    k_signals = []
-                    labels = []
-                    b_num += 1
-
-            sampleinfo.append("\t".join(words[0:6]))
-            kmers.append([base2code_dna[x] for x in words[6]])
-            base_means.append([float(x) for x in words[7].split(",")])
-            base_stds.append([float(x) for x in words[8].split(",")])
-            base_signal_lens.append([int(x) for x in words[9].split(",")])
-            k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
-            labels.append(int(words[11]))
-        r_num += 1
-        if len(sampleinfo) > 0:
-            features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
-                                  base_signal_lens, k_signals, labels))
-            b_num += 1
+    infile.close()
+    r_num += 1
+    if len(sampleinfo) > 0:
+        features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
+                              base_signal_lens, k_signals, labels))
+        b_num += 1
     features_batch_q.put("kill")
     print("read_features process-{} ending, read {} reads in {} f5-batches({})".format(os.getpid(),
                                                                                        r_num, b_num,
@@ -237,21 +245,27 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
                                                                                args.batch_size))
 
 
-def _write_predstr_to_file(write_fp, predstr_q):
+def _write_predstr_to_file(write_fp, predstr_q, is_gzip):
     print('write_process-{} starts'.format(os.getpid()))
-    with open(write_fp, 'w') as wf:
-        while True:
-            # during test, it's ok without the sleep()
-            if predstr_q.empty():
-                time.sleep(time_wait)
-                continue
-            pred_str = predstr_q.get()
-            if pred_str == "kill":
-                print('write_process-{} finished'.format(os.getpid()))
-                break
-            for one_pred_str in pred_str:
-                wf.write(one_pred_str + "\n")
-            wf.flush()
+    if is_gzip:
+        if not write_fp.endswith(".gz"):
+            write_fp += ".gz"
+        wf = gzip.open(write_fp, "wt")
+    else:
+        wf = open(write_fp, 'w')
+    while True:
+        # during test, it's ok without the sleep()
+        if predstr_q.empty():
+            time.sleep(time_wait)
+            continue
+        pred_str = predstr_q.get()
+        if pred_str == "kill":
+            wf.close()
+            print('write_process-{} finished'.format(os.getpid()))
+            break
+        for one_pred_str in pred_str:
+            wf.write(one_pred_str + "\n")
+        wf.flush()
 
 
 def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioninfo, args):
@@ -383,7 +397,7 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
     # queue of writing
     # print("write_process started..")
-    p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
+    p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q, args.gzip))
     p_w.daemon = True
     p_w.start()
 
@@ -461,7 +475,7 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
 
     # queue of writing
     # print("write_process started..")
-    p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
+    p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q, args.gzip))
     p_w.daemon = True
     p_w.start()
 
@@ -486,97 +500,6 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
     p_w.join()
 
     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
-
-
-# def _fast5s_q_to_pred_str_q(fast5s_q, errornum_q, pred_str_q,
-#                             motif_seqs, chrom2len, model_path, positions, args):
-#     print('call_mods process-{} starts'.format(os.getpid()))
-#     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
-#                         args.dropout_rate, args.hid_rnn,
-#                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
-#                         args.model_type)
-#     # this function is designed for CPU, disable cuda
-#     # if use_cuda:
-#     #     model = model.cuda()
-#
-#     para_dict = torch.load(model_path, map_location=torch.device('cpu'))
-#     model_dict = model.state_dict()
-#     model_dict.update(para_dict)
-#     model.load_state_dict(model_dict)
-#
-#     model.eval()
-#
-#     accuracy_list = []
-#     batch_num_total = 0
-#     f5_num = 0
-#     while True:
-#         if fast5s_q.empty():
-#             time.sleep(time_wait)
-#         fast5s = fast5s_q.get()
-#         if fast5s == "kill":
-#             fast5s_q.put("kill")
-#             break
-#         f5_num += len(fast5s)
-#         features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions,
-#                                                              args)
-#         errornum_q.put(error)
-#         for features_batch in features_batches:
-#             pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
-#
-#             pred_str_q.put(pred_str)
-#             accuracy_list.append(accuracy)
-#             batch_num_total += batch_num
-#     # print('total accuracy in process {}: {}'.format(os.getpid(), np.mean(accuracy_list)))
-#     print('call_mods process-{} ending, proceed {} fast5s ({} batches)'.format(os.getpid(), f5_num, batch_num_total))
-
-
-# def _call_mods_from_fast5s_cpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, positions, model_path,
-#                                success_file, args):
-#
-#     # errornum_q = mp.Queue()
-#     errornum_q = Queue()
-#
-#     # pred_str_q = mp.Queue()
-#     pred_str_q = Queue()
-#
-#     nproc = args.nproc
-#     if nproc < 1:
-#         nproc = 1
-#     elif nproc > 1:
-#         nproc -= 1
-#
-#     fast5s_q.put("kill")
-#     pred_str_procs = []
-#     for _ in range(nproc):
-#         p = mp.Process(target=_fast5s_q_to_pred_str_q, args=(fast5s_q, errornum_q, pred_str_q,
-#                                                              motif_seqs, chrom2len, model_path, positions,
-#                                                              args))
-#         p.daemon = True
-#         p.start()
-#         pred_str_procs.append(p)
-#
-#     # print("write_process started..")
-#     p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
-#     p_w.daemon = True
-#     p_w.start()
-#
-#     errornum_sum = 0
-#     while True:
-#         running = any(p.is_alive() for p in pred_str_procs)
-#         while not errornum_q.empty():
-#             errornum_sum += errornum_q.get()
-#         if not running:
-#             break
-#
-#     for p in pred_str_procs:
-#         p.join()
-#
-#     # print("finishing the write_process..")
-#     pred_str_q.put("kill")
-#
-#     p_w.join()
-#
-#     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
 
 
 def call_mods(args):
@@ -668,7 +591,7 @@ def call_mods(args):
             predstr_procs.append(p)
 
         # print("write_process started..")
-        p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q))
+        p_w = mp.Process(target=_write_predstr_to_file, args=(args.result_file, pred_str_q, args.gzip))
         p_w.daemon = True
         p_w.start()
 
@@ -741,6 +664,8 @@ def main():
     p_output = parser.add_argument_group("OUTPUT")
     p_output.add_argument("--result_file", "-o", action="store", type=str, required=True,
                           help="the file path to save the predicted result")
+    p_output.add_argument("--gzip", action="store_true", default=False, required=False,
+                          help="if compressing the output using gzip")
 
     p_f5 = parser.add_argument_group("FAST5_EXTRACTION")
     p_f5.add_argument("--recursively", "-r", action="store", type=str, required=False,

@@ -71,13 +71,14 @@ def calculate_mods_frequency(mods_files, prob_cf, contig_name=None):
     return sitekey2stats
 
 
-def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
+def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed, is_gzip):
     """
     write methylfreq of sites into files
     :param sitekey2stats:
     :param result_file:
     :param is_sort: sorted by poses
     :param is_bed: in bed format or not
+    :param is_gzip:
     :return:
     """
     if is_sort:
@@ -85,30 +86,37 @@ def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
     else:
         keys = list(sitekey2stats.keys())
 
-    with open(result_file, 'w') as wf:
-        # wf.write('\t'.join(['chromosome', 'pos', 'strand', 'pos_in_strand', 'prob0', 'prob1',
-        #                     'met', 'unmet', 'coverage', 'Rmet', 'kmer']) + '\n')
-        for key in keys:
-            chrom, pos = split_key(key)
-            sitestats = sitekey2stats[key]
-            assert(sitestats._coverage == (sitestats._met + sitestats._unmet))
-            if sitestats._coverage > 0:
-                rmet = float(sitestats._met) / sitestats._coverage
-                if is_bed:
-                    wf.write("\t".join([chrom, str(pos), str(pos + 1), ".", str(sitestats._coverage),
-                                        sitestats._strand,
-                                        str(pos), str(pos + 1), "0,0,0", str(sitestats._coverage),
-                                        str(int(round(rmet * 100, 0)))]) + "\n")
-                else:
-                    wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
-                                                                                     sitestats._pos_in_strand,
-                                                                                     sitestats._prob_0,
-                                                                                     sitestats._prob_1,
-                                                                                     sitestats._met, sitestats._unmet,
-                                                                                     sitestats._coverage, rmet,
-                                                                                     sitestats._kmer))
+    if is_gzip:
+        if not result_file.endswith(".gz"):
+            result_file += ".gz"
+        wf = gzip.open(result_file, "wt")
+    else:
+        wf = open(result_file, 'w')
+    # wf.write('\t'.join(['chromosome', 'pos', 'strand', 'pos_in_strand', 'prob0', 'prob1',
+    #                     'met', 'unmet', 'coverage', 'Rmet', 'kmer']) + '\n')
+    for key in keys:
+        chrom, pos = split_key(key)
+        sitestats = sitekey2stats[key]
+        assert(sitestats._coverage == (sitestats._met + sitestats._unmet))
+        if sitestats._coverage > 0:
+            rmet = float(sitestats._met) / sitestats._coverage
+            if is_bed:
+                wf.write("\t".join([chrom, str(pos), str(pos + 1), ".", str(sitestats._coverage),
+                                    sitestats._strand,
+                                    str(pos), str(pos + 1), "0,0,0", str(sitestats._coverage),
+                                    str(int(round(rmet * 100, 0)))]) + "\n")
             else:
-                print("{} {} has no coverage..".format(chrom, pos))
+                wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
+                                                                                 sitestats._pos_in_strand,
+                                                                                 sitestats._prob_0,
+                                                                                 sitestats._prob_1,
+                                                                                 sitestats._met, sitestats._unmet,
+                                                                                 sitestats._coverage, rmet,
+                                                                                 sitestats._kmer))
+        else:
+            print("{} {} has no coverage..".format(chrom, pos))
+    wf.flush()
+    wf.close()
 
 
 def _read_file_lines(cfile):
@@ -161,7 +169,8 @@ def _split_file_by_contignames(mods_files, wprefix, contigs):
         wfs[contig].close()
 
 
-def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbed, contigs_q, resfiles_q):
+def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbed, isgzip,
+                                     contigs_q, resfiles_q):
     print("process-{} -- starts".format(os.getpid()))
     while True:
         if contigs_q.empty():
@@ -182,7 +191,7 @@ def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbe
             print("process-{} for contig-{} -- writing the result..".format(os.getpid(), contig_name))
             fname, fext = os.path.splitext(result_file)
             c_result_file = fname + "." + contig_name + "." + str(uuid.uuid1()) + fext
-            write_sitekey2stats(sites_stats, c_result_file, issort, isbed)
+            write_sitekey2stats(sites_stats, c_result_file, issort, isbed, isgzip)
             resfiles_q.put(c_result_file)
         os.remove(input_file)
     print("process-{} -- ends".format(os.getpid()))
@@ -209,6 +218,7 @@ def call_mods_frequency_to_file(args):
     file_uid = args.file_uid
     issort = args.sort
     isbed = args.bed
+    is_gzip = args.gzip
 
     mods_files = []
     for ipath in input_paths:
@@ -241,7 +251,7 @@ def call_mods_frequency_to_file(args):
         print("read the input files..")
         sites_stats = calculate_mods_frequency(mods_files, prob_cf)
         print("write the result..")
-        write_sitekey2stats(sites_stats, result_file, issort, isbed)
+        write_sitekey2stats(sites_stats, result_file, issort, isbed, is_gzip)
     else:
         print("start processing {} contigs..".format(len(contigs)))
         wprefix = os.path.dirname(os.path.abspath(result_file)) + "/tmp." + str(uuid.uuid1())
@@ -256,7 +266,7 @@ def call_mods_frequency_to_file(args):
         procs_contig = []
         for _ in range(args.nproc):
             p_contig = mp.Process(target=_call_and_write_modsfreq_process,
-                                  args=(wprefix, prob_cf, result_file, issort, isbed,
+                                  args=(wprefix, prob_cf, result_file, issort, isbed, is_gzip,
                                         contigs_q, resfiles_q))
             p_contig.daemon = True
             p_contig.start()
@@ -309,6 +319,8 @@ def main():
                         help='this is to remove ambiguous calls. '
                              'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
                              'means use all calls. range [0, 1], default 0.5.')
+    parser.add_argument("--gzip", action="store_true", default=False, required=False,
+                        help="if compressing the output using gzip")
 
     args = parser.parse_args()
 

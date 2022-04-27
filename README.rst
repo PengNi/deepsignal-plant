@@ -6,7 +6,9 @@ Release
 -------
 0.1.6
 -----
-bug fixes (train module, )
+bug fixes
+
+enable .gz output in extract/call_mods/call_freq modules
 
 
 0.1.5

@@ -39,10 +39,12 @@ def main_extraction(args):
     nproc = args.nproc
     f5_batch_size = args.f5_batch_size
 
+    is_gzip = args.gzip
+
     extract_features(fast5_dir, is_recursive, reference_path, is_dna,
                      f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
                      normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
-                     position_file, regionstr, w_is_dir, w_batch_num)
+                     position_file, regionstr, w_is_dir, w_batch_num, is_gzip)
 
 
 def main_call_mods(args):
@@ -195,6 +197,8 @@ def main():
     se_output.add_argument("--w_batch_num", action="store",
                            type=int, required=False, default=200,
                            help='features batch num to save in a single writed file when --is_dir is true')
+    se_output.add_argument("--gzip", action="store_true", default=False, required=False,
+                           help="if compressing the output using gzip")
 
     sub_extract.add_argument("--nproc", "-p", action="store", type=int, default=1,
                              required=False,
@@ -257,6 +261,8 @@ def main():
     sc_output = sub_call_mods.add_argument_group("OUTPUT")
     sc_output.add_argument("--result_file", "-o", action="store", type=str, required=True,
                            help="the file path to save the predicted result")
+    sc_output.add_argument("--gzip", action="store_true", default=False, required=False,
+                           help="if compressing the output using gzip")
 
     sc_f5 = sub_call_mods.add_argument_group("FAST5_EXTRACTION")
     sc_f5.add_argument("--recursively", "-r", action="store", type=str, required=False,
@@ -451,10 +457,12 @@ def main():
     scf_output = sub_call_freq.add_argument_group("OUTPUT")
     scf_output.add_argument('--result_file', '-o', action="store", type=str, required=True,
                             help='the file path to save the result')
+    scf_output.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
+    scf_output.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
+    scf_output.add_argument("--gzip", action="store_true", default=False, required=False,
+                            help="if compressing the output using gzip")
 
     scf_cal = sub_call_freq.add_argument_group("CAlCULATE")
-    scf_cal.add_argument('--bed', action='store_true', default=False, help="save the result in bedMethyl format")
-    scf_cal.add_argument('--sort', action='store_true', default=False, help="sort items in the result")
     scf_cal.add_argument('--prob_cf', type=float, action="store", required=False, default=0.5,
                          help='this is to remove ambiguous calls. '
                               'if abs(prob1-prob0)>=prob_cf, then we use the call. e.g., proc_cf=0 '
