@@ -33,9 +33,9 @@ def parse_a_line2(line):
 
 class SignalFeaData2(Dataset):
     def __init__(self, filename, transform=None):
-        print(">>>using linecache to access '{}'<<<\n"
-              ">>>after done using the file, "
-              "remember to use linecache.clearcache() to clear cache for safety<<<".format(filename))
+        # print(">>>using linecache to access '{}'<<<\n"
+        #       ">>>after done using the file, "
+        #       "remember to use linecache.clearcache() to clear cache for safety<<<".format(filename))
         self._filename = os.path.abspath(filename)
         self._total_data = 0
         self._transform = transform
