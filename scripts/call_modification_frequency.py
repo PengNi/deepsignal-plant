@@ -65,7 +65,7 @@ def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed):
                     wf.write("\t".join([chrom, str(pos), str(pos + 1), ".", str(sitestats._coverage),
                                         sitestats._strand,
                                         str(pos), str(pos + 1), "0,0,0", str(sitestats._coverage),
-                                        str(int(round(rmet * 100, 0)))]) + "\n")
+                                        str(int(round(rmet * 100 + 0.001, 0)))]) + "\n")
                 else:
                     wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
                                                                                      sitestats._pos_in_strand,

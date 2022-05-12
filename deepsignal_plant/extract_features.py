@@ -34,7 +34,7 @@ from .utils.ref_reader import get_contig2len
 from .utils.process_utils import parse_region_str
 
 reads_group = 'Raw/Reads'
-queen_size_border_f5batch = 100
+queue_size_border_f5batch = 100
 time_wait = 1
 # MAX_LEGAL_SIGNAL_NUM = 800  # 800 only for 17-mer
 
@@ -443,7 +443,7 @@ def get_a_batch_features_str(fast5s_q, featurestr_q, errornum_q,
 
         errornum_q.put(error_num)
         featurestr_q.put(features_str)
-        while featurestr_q.qsize() > queen_size_border_f5batch:
+        while featurestr_q.qsize() > queue_size_border_f5batch:
             time.sleep(time_wait)
     print("extrac_features process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 

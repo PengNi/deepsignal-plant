@@ -45,7 +45,8 @@ else:
 
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
-queen_size_border_f5batch = 100
+queue_size_border_f5batch = 100
+queue_size_border = 1000
 time_wait = 1
 
 
@@ -94,7 +95,7 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
             if r_num % f5_batch_size == 0:
                 features_batch_q.put((sampleinfo, kmers, base_means, base_stds,
                                       base_signal_lens, k_signals, labels))
-                while features_batch_q.qsize() > queen_size_border_f5batch:
+                while features_batch_q.qsize() > queue_size_border_f5batch:
                     time.sleep(time_wait)
                 sampleinfo = []
                 kmers = []
@@ -235,6 +236,8 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
         pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
 
         pred_str_q.put(pred_str)
+        while pred_str_q.qsize() > queue_size_border:
+            time.sleep(time_wait)
         # for debug
         # print("call_mods process-{} reads 1 batch, features_batch_q:{}, "
         #       "pred_str_q: {}".format(os.getpid(), features_batch_q.qsize(), pred_str_q.qsize()))
@@ -338,7 +341,7 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
         errornum_q.put(error)
         for features_batch in features_batches:
             features_batch_q.put(features_batch)
-        while features_batch_q.qsize() > queen_size_border_f5batch:
+        while features_batch_q.qsize() > queue_size_border_f5batch:
             time.sleep(time_wait)
     print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 

@@ -22,7 +22,7 @@ import uuid
 
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
-time_wait = 3
+time_wait = 1
 
 
 def calculate_mods_frequency(mods_files, prob_cf, contig_name=None):
@@ -106,7 +106,7 @@ def write_sitekey2stats(sitekey2stats, result_file, is_sort, is_bed, is_gzip):
                 wf.write("\t".join([chrom, str(pos), str(pos + 1), ".", str(sitestats._coverage),
                                     sitestats._strand,
                                     str(pos), str(pos + 1), "0,0,0", str(sitestats._coverage),
-                                    str(int(round(rmet * 100, 0)))]) + "\n")
+                                    str(int(round(rmet * 100 + 0.001, 0)))]) + "\n")
             else:
                 wf.write("%s\t%d\t%s\t%d\t%.3f\t%.3f\t%d\t%d\t%d\t%.4f\t%s\n" % (chrom, pos, sitestats._strand,
                                                                                  sitestats._pos_in_strand,
@@ -199,14 +199,18 @@ def _call_and_write_modsfreq_process(wprefix, prob_cf, result_file, issort, isbe
     print("process-{} -- ends".format(os.getpid()))
 
 
-def _concat_contig_results(contig_files, result_file):
-    wf = open(result_file, "w")
+def _concat_contig_results(contig_files, result_file, is_gzip=False):
+    if is_gzip:
+        if not result_file.endswith(".gz"):
+            result_file += ".gz"
+        wf = gzip.open(result_file, "wt")
+    else:
+        wf = open(result_file, 'w')
     for cfile in sorted(contig_files):
         with open(cfile, 'r') as rf:
             for line in rf:
                 wf.write(line)
         os.remove(cfile)
-    wf.flush()
     wf.close()
 
 
@@ -268,7 +272,7 @@ def call_mods_frequency_to_file(args):
         procs_contig = []
         for _ in range(args.nproc):
             p_contig = mp.Process(target=_call_and_write_modsfreq_process,
-                                  args=(wprefix, prob_cf, result_file, issort, isbed, is_gzip,
+                                  args=(wprefix, prob_cf, result_file, issort, isbed, False,
                                         contigs_q, resfiles_q))
             p_contig.daemon = True
             p_contig.start()
@@ -287,7 +291,7 @@ def call_mods_frequency_to_file(args):
         except AssertionError:
             print("!!!Please check the result files -- seems not all inputed contigs have result!!!")
         print("combine results of {} contigs..".format(len(resfiles_cs)))
-        _concat_contig_results(resfiles_cs, result_file)
+        _concat_contig_results(resfiles_cs, result_file, is_gzip)
     print("[main]call_freq costs %.1f seconds.." % (time.time() - start))
 
 
