@@ -10,6 +10,8 @@ bug fixes
 
 enable .gz output in extract/call_mods/call_freq modules
 
+multi-gpu support in call_mods module
+
 
 0.1.5
 -----

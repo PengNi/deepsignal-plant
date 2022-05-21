@@ -152,7 +152,7 @@ def train_1time(train_file, valid_file, valid_lidxs, args):
         vprecs.append(i_precision)
         vrecas.append(i_recall)
 
-        if (vi + 1) % args.step_interval == 0:
+        if (vi + 1) % args.step_interval == 0 or (vi + 1) == total_step:
             endtime = time.time()
             print('===Test, Step [{}/{}], ValidLoss: {:.4f}, '
                   'Accuracy: {:.4f}, Precision: {:.4f}, Recall: {:.4f}, '

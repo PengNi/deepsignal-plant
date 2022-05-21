@@ -115,7 +115,7 @@ def combine_fb_of_bed(report_fp, cgposes):
         chrom, fpos = cgpos[0], cgpos[1]
         mposinfo.append([chrom, fpos, fpos+1, ".", pos2info[cgpos][0], "+",
                          fpos, fpos+1, "0,0,0", pos2info[cgpos][0],
-                         int(round(pos2info[cgpos][2], 2) * 100)])
+                         int(round(pos2info[cgpos][2] + 0.000001, 2) * 100)])
     mposinfo = sorted(mposinfo, key=lambda x: (x[0], x[1]))
     return mposinfo
 

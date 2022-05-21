@@ -451,6 +451,7 @@ def _rand_select_by_kmer_ratio(kmer2lines, kmer2ratios, totalline):
                                                                              len(line_kmer_diff),
                                                                              len(ratio_kmer_diff)))
     selected_lines = []
+    unselected_lines = []
     unratioed_kmers = line_kmer_diff
     cnts = 0
     for kmer in inter_kmers:
@@ -460,7 +461,9 @@ def _rand_select_by_kmer_ratio(kmer2lines, kmer2ratios, totalline):
             selected_lines += lines
             cnts += (linenum - len(lines))
         else:
-            selected_lines += random.sample(lines, linenum)
+            seledtmp = random.sample(lines, linenum)
+            selected_lines += seledtmp
+            unselected_lines += list(set(lines).difference(seledtmp))
     print("for {} common kmers, fill {} samples, "
           "{} samples that can't be filled".format(len(inter_kmers),
                                                    len(selected_lines),
@@ -480,9 +483,22 @@ def _rand_select_by_kmer_ratio(kmer2lines, kmer2ratios, totalline):
                 selected_lines += lines
                 cnts += len(lines)
             else:
-                selected_lines += random.sample(lines, minlinenum)
+                seledtmp = random.sample(lines, minlinenum)
+                selected_lines += seledtmp
                 cnts += minlinenum
+                unselected_lines += list(set(lines).difference(seledtmp))
         print("extract {} samples from {} line_diff kmers".format(cnts, len(unratioed_kmers)))
+    unfilled_cnt = totalline - len(selected_lines)
+    if unfilled_cnt > 0:
+        print("totalline: {}, still need to fill: {}".format(totalline, unfilled_cnt))
+        random.shuffle(unselected_lines)
+        triplefill_cnt = unfilled_cnt
+        if len(unselected_lines) <= unfilled_cnt:
+            selected_lines += unselected_lines
+            triplefill_cnt = len(unselected_lines)
+        else:
+            selected_lines += unselected_lines[:unfilled_cnt]
+        print("extract {} samples from {} samples not used above".format(triplefill_cnt, len(unselected_lines)))
     selected_lines = sorted(selected_lines)
     selected_lines = [-1] + selected_lines
     return selected_lines

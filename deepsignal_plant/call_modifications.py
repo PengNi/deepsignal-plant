@@ -125,7 +125,7 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
                                                                                        f5_batch_size))
 
 
-def _call_mods(features_batch, model, batch_size):
+def _call_mods(features_batch, model, batch_size, device=0):
     """
     call modification from a batch of features
     :param features_batch:  a bathc of features, contains lists
@@ -154,8 +154,10 @@ def _call_mods(features_batch, model, batch_size):
 
         # call mods of each batch
         if len(b_sampleinfo) > 0:
-            voutputs, vlogits = model(FloatTensor(b_kmers), FloatTensor(b_base_means), FloatTensor(b_base_stds),
-                                      FloatTensor(b_base_signal_lens), FloatTensor(b_k_signals))
+            voutputs, vlogits = model(FloatTensor(b_kmers, device), FloatTensor(b_base_means, device),
+                                      FloatTensor(b_base_stds, device),
+                                      FloatTensor(b_base_signal_lens, device),
+                                      FloatTensor(b_k_signals, device))
             _, vpredicted = torch.max(vlogits.data, 1)
             if use_cuda:
                 vlogits = vlogits.cpu()
@@ -189,7 +191,7 @@ def _call_mods(features_batch, model, batch_size):
     return pred_str, accuracy, batch_num
 
 
-def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
+def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args, device=0):
     """
     subprocess for calling modifications
     :param model_path:
@@ -203,17 +205,16 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
                         args.dropout_rate, args.hid_rnn,
                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
-                        args.model_type)
-    if use_cuda:
-        model = model.cuda()
-        para_dict = torch.load(model_path)
-    else:
-        para_dict = torch.load(model_path, map_location=torch.device('cpu'))
+                        module=args.model_type, device=device)
 
+    para_dict = torch.load(model_path, map_location=torch.device('cpu'))
+    # para_dict = torch.load(model_path, map_location=torch.device(device))
     model_dict = model.state_dict()
     model_dict.update(para_dict)
     model.load_state_dict(model_dict)
 
+    if use_cuda:
+        model = model.cuda(device)
     model.eval()
 
     accuracy_list = []
@@ -233,7 +234,7 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args):
             # open(success_file, 'w').close()
             break
 
-        pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size)
+        pred_str, accuracy, batch_num = _call_mods(features_batch, model, args.batch_size, device)
 
         pred_str_q.put(pred_str)
         while pred_str_q.qsize() > queue_size_border:
@@ -391,9 +392,12 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
 
     # queues of features->mods_call
     call_mods_gpu_procs = []
+    gpulist = _get_gpus()
+    gpuindex = 0
     for _ in range(nproc_gpu):
         p_call_mods_gpu = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
-                                                                success_file, args))
+                                                                success_file, args, gpulist[gpuindex]))
+        gpuindex += 1
         p_call_mods_gpu.daemon = True
         p_call_mods_gpu.start()
         call_mods_gpu_procs.append(p_call_mods_gpu)
@@ -505,6 +509,15 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
     print("%d of %d fast5 files failed.." % (errornum_sum, len_fast5s))
 
 
+def _get_gpus():
+    num_gpus = torch.cuda.device_count()
+    if num_gpus > 0:
+        gpulist = list(range(num_gpus))
+    else:
+        gpulist = [0]
+    return gpulist * 1000
+
+
 def call_mods(args):
     """
     main function of calling modification
@@ -586,9 +599,12 @@ def call_mods(args):
             if nproc_dp > nproc_to_call_mods_in_cpu_mode:
                 nproc_dp = nproc_to_call_mods_in_cpu_mode
 
+        gpulist = _get_gpus()
+        gpuindex = 0
         for _ in range(nproc_dp):
             p = mp.Process(target=_call_mods_q, args=(model_path, features_batch_q, pred_str_q,
-                                                      success_file, args))
+                                                      success_file, args, gpulist[gpuindex]))
+            gpuindex += 1
             p.daemon = True
             p.start()
             predstr_procs.append(p)

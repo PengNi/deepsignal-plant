@@ -103,10 +103,11 @@ class ModelBiLSTM(nn.Module):
     def __init__(self, seq_len=13, signal_len=16, num_layers1=3, num_layers2=1, num_classes=2,
                  dropout_rate=0.5, hidden_size=256,
                  vocab_size=16, embedding_size=4, is_base=True, is_signallen=True,
-                 module="both_bilstm"):
+                 module="both_bilstm", device=0):
         super(ModelBiLSTM, self).__init__()
         self.model_type = 'BiLSTM'
         self.module = module
+        self.device = device
 
         self.seq_len = seq_len
         self.signal_len = signal_len
@@ -170,8 +171,8 @@ class ModelBiLSTM(nn.Module):
         h0 = autograd.Variable(torch.randn(num_layers * 2, batch_size, hidden_size))
         c0 = autograd.Variable(torch.randn(num_layers * 2, batch_size, hidden_size))
         if use_cuda:
-            h0 = h0.cuda()
-            c0 = c0.cuda()
+            h0 = h0.cuda(self.device)
+            c0 = c0.cuda(self.device)
         return h0, c0
 
     def forward(self, kmer, base_means, base_stds, base_signal_lens, signals):
