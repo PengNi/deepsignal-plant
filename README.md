@@ -213,7 +213,9 @@ The extracted_features file is a tab-delimited text file in the following format
 
 #### 3. call modifications
 
-To call modifications, either the extracted-feature file or **the raw fast5 files (recommended)** can be used as input.
+To call modifications, either the extracted-feature file or **the raw fast5 files (recommended)** can be used as input. 
+
+**GPU/Multi-GPU support**: Use `CUDA_VISIBLE_DEVICES=${cuda_number} ccsmeth call_mods [options]` to call modifications with specified GPUs (_e.g._, `CUDA_VISIBLE_DEVICES=0` or `CUDA_VISIBLE_DEVICES=0,1`).
 
 For the example data:
 ```bash
