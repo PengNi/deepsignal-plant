@@ -20,7 +20,8 @@ from .utils.process_utils import MyQueue as Queue
 from .utils.process_utils import is_file_empty
 import uuid
 
-os.environ['MKL_THREADING_LAYER'] = 'GNU'
+# # add this export temporarily
+# os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
 time_wait = 1
 

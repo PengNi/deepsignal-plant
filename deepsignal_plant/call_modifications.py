@@ -43,6 +43,8 @@ if use_cuda:
 else:
     from .utils.process_utils import MyQueue as Queue
 
+# add this export temporarily
+# https://github.com/pytorch/pytorch/issues/37377
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
 queue_size_border_f5batch = 100

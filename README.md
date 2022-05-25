@@ -14,7 +14,7 @@ deepsignal-plant applies BiLSTM to detect methylation from Nanopore reads. It is
 
 
 #### Known issues
-- The VBZ compression issue is not completely solved yet. Please try the commands listed below, normally it will work after setting `HDF5_PLUGIN_PATH`:
+- [The VBZ compression issue] Please try adding ont-vbz-hdf-plugin to your environment as follows when all fast5s failed in `tombo resquiggle` and/or `deepsignal_plant call_mods`. Normally it will work after setting `HDF5_PLUGIN_PATH`:
 ```shell
 # 1. install hdf5/hdf5-tools (maybe not necessary)
 # ubuntu
