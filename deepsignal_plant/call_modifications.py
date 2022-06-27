@@ -176,8 +176,7 @@ def _call_mods(features_batch, model, batch_size, device=0):
                 # chromosome, pos, strand, pos_in_strand, read_name, read_strand, prob_0, prob_1, called_label, seq
                 prob_0, prob_1 = logits[idx][0], logits[idx][1]
                 prob_0_norm = round(prob_0 / (prob_0 + prob_1), 6)
-                prob_1_norm = round(prob_1 / (prob_0 + prob_1), 6)
-
+                prob_1_norm = round(1 - prob_0_norm, 6)
                 # kmer-5
                 b_idx_kmer = ''.join([code2base_dna[x] for x in b_kmers[idx]])
                 center_idx = int(np.floor(len(b_idx_kmer) / 2))

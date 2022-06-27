@@ -42,7 +42,7 @@ References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [to
 ## Installation
 deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](https://pytorch.org/). [Guppy](https://nanoporetech.com/community) and [tombo](https://github.com/nanoporetech/tombo) are required to basecall and re-squiggle the raw signals from nanopore reads before running deepsignal-plant.
    - Prerequisites: \
-       [Python3.*](https://www.python.org/) (version>=3.7)\
+       [Python3.*](https://www.python.org/) (version>=3.8)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
    - Dependencies: \
@@ -50,13 +50,13 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [h5py](https://github.com/h5py/h5py) \
        [statsmodels](https://github.com/statsmodels/statsmodels/) \
        [scikit-learn](https://scikit-learn.org/stable/) \
-       [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.7.0?)
+       [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.11.0)
 
 #### 1. Create an environment
 We highly recommend using a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
 # create
-conda create -n deepsignalpenv python=3.7
+conda create -n deepsignalpenv python=3.8
 
 # activate
 conda activate deepsignalpenv
@@ -84,10 +84,10 @@ python setup.py install
 - [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
 ```bash
 # install using conda
-conda install pytorch==1.4.0 torchvision==0.5.0 cudatoolkit=10.1 -c pytorch
+conda install pytorch==1.11.0 cudatoolkit=10.2 -c pytorch
 
 # or install using pip
-pip install torch==1.4.0 torchvision==0.5.0
+pip install torch==1.11.0
 ```
 
 - [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
