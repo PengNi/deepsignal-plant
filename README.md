@@ -51,8 +51,8 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [scikit-learn](https://scikit-learn.org/stable/) \
        [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.11.0)
 
-#### 1. One-step installation
-Install deepsignal-plant, its dependencies, and [tombo](https://github.com/nanoporetech/tombo) in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
+#### Option 1. One-step installation
+Install deepsignal-plant, its dependencies, and other required packages in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
 
 ```shell
 # download deepsignal-plant
@@ -65,7 +65,7 @@ conda env create --name deepsignalpenv -f /path/to/deepsignal-plant/environment.
 conda activate deepsignalpenv
 ```
 
-#### 2. Step-by-step installation
+#### Option 2. Step-by-step installation
 ##### (1) create an environment
 We highly recommend using a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
