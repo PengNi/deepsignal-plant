@@ -11,7 +11,7 @@ dependencies:
   - h5py>=2.8.0,<3  # <3 is for tombo
   - statsmodels>=0.13.2
   - scikit-learn>=1.0.2
-  - pytorch::pytorch=1.10.0  # add channel prefix (pytorch::) to make sure the cuda version being installed?
+  - pytorch::pytorch=1.11.0  # add channel prefix (pytorch::) to make sure the cuda version being installed?
   - scipy
   - pandas
   - samtools>=1.12  # will install dependence->htslib, which includes tabix and bgzip

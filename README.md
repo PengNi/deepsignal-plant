@@ -99,10 +99,10 @@ python setup.py install
 [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
 ```bash
 # install using conda
-conda install pytorch==1.10.0 cudatoolkit=10.2 -c pytorch
+conda install pytorch==1.11.0 cudatoolkit=10.2 -c pytorch
 
 # or install using pip
-pip install torch==1.10.0
+pip install torch==1.11.0
 ```
 
 ##### (4) Install tombo

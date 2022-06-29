@@ -4,6 +4,11 @@ deepsignal-plant
 
 Release
 -------
+0.1.7
+-----
+optimize/test more on multi-gpu support in call_mods module
+
+
 0.1.6
 -----
 bug fixes

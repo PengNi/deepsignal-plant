@@ -85,7 +85,7 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
     base_means.append([float(x) for x in words[7].split(",")])
     base_stds.append([float(x) for x in words[8].split(",")])
     base_signal_lens.append([int(x) for x in words[9].split(",")])
-    k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
+    k_signals.append([[float(y) for y in x.split(",")] for x in words[10].split(";")])
     labels.append(int(words[11]))
 
     for line in infile:
@@ -113,7 +113,7 @@ def _read_features_file(features_file, features_batch_q, f5_batch_size=10):
         base_means.append([float(x) for x in words[7].split(",")])
         base_stds.append([float(x) for x in words[8].split(",")])
         base_signal_lens.append([int(x) for x in words[9].split(",")])
-        k_signals.append(np.array([[float(y) for y in x.split(",")] for x in words[10].split(";")]))
+        k_signals.append([[float(y) for y in x.split(",")] for x in words[10].split(";")])
         labels.append(int(words[11]))
     infile.close()
     r_num += 1
@@ -203,6 +203,14 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args, d
     :return: call_mods from features_batch_q to pred_str_q
     """
     print('call_mods process-{} starts'.format(os.getpid()))
+
+    # TODO: when using multi-gpu, the process seems to not work as expected.
+    #  models not in the 1st gpu card tend to occupy memory of
+    #  both the 1st gpu card and the card where the model is in,
+    #  especially at the time when the process is about to ending.
+    #  [In torch 1.6.0, 1.7.0, 1.8.0, 1.11.0, the models seem to only occupy
+    #  memory of both cards at the end, while in 1.9.0/1.10.0, the models
+    #  occupy memory of both cards all the time.]
     model = ModelBiLSTM(args.seq_len, args.signal_len, args.layernum1, args.layernum2, args.class_num,
                         args.dropout_rate, args.hid_rnn,
                         args.n_vocab, args.n_embed, str2bool(args.is_base), str2bool(args.is_signallen),
@@ -213,6 +221,7 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args, d
     model_dict = model.state_dict()
     model_dict.update(para_dict)
     model.load_state_dict(model_dict)
+    del model_dict
 
     if use_cuda:
         model = model.cuda(device)

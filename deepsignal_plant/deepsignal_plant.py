@@ -192,9 +192,9 @@ def main():
     se_output.add_argument("--gzip", action="store_true", default=False, required=False,
                            help="if compressing the output using gzip")
 
-    sub_extract.add_argument("--nproc", "-p", action="store", type=int, default=1,
+    sub_extract.add_argument("--nproc", "-p", action="store", type=int, default=10,
                              required=False,
-                             help="number of processes to be used, default 1")
+                             help="number of processes to be used, default 10")
     sub_extract.add_argument("--f5_batch_size", action="store", type=int, default=30,
                              required=False,
                              help="number of files to be processed by each process one time, default 30")
