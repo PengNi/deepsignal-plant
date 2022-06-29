@@ -55,7 +55,11 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
 Install deepsignal-plant, its dependencies, and [tombo](https://github.com/nanoporetech/tombo) in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
 
 ```shell
-conda env create --name deepsignalpenv -f environment.yml
+# download deepsignal-plant
+git clone https://github.com/PengNi/deepsignal-plant.git
+
+# install tools in environment.yml
+conda env create --name deepsignalpenv -f /path/to/deepsignal-plant/environment.yml
 
 # then the environment can be activated to use
 conda activate deepsignalpenv
@@ -95,20 +99,20 @@ python setup.py install
 [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
 ```bash
 # install using conda
-conda install pytorch==1.11.0 cudatoolkit=10.2 -c pytorch
+conda install pytorch==1.10.0 cudatoolkit=10.2 -c pytorch
 
 # or install using pip
-pip install torch==1.11.0
+pip install torch==1.10.0
 ```
 
 ##### (4) Install tombo
-[tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
+[tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed:
 ```bash
-# install using conda
-conda install -c bioconda ont-tombo
-
-# or install using pip
+# install using pip
 pip install ont-tombo
+
+# or install using conda
+conda install -c bioconda ont-tombo
 ```
 
 **Note:**

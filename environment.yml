@@ -7,8 +7,8 @@ dependencies:
   - python>=3.8
   - pip
   - cudatoolkit=10.2  # 10.2 is ok for 1.7.0-1.11.0
-  - numpy>=1.19.2
-  - h5py>=2.8.0
+  - numpy>=1.19.2,<1.20  # <1.20 is for tombo
+  - h5py>=2.8.0,<3  # <3 is for tombo
   - statsmodels>=0.13.2
   - scikit-learn>=1.0.2
   - pytorch::pytorch=1.10.0  # add channel prefix (pytorch::) to make sure the cuda version being installed?
@@ -17,4 +17,5 @@ dependencies:
   - samtools>=1.12  # will install dependence->htslib, which includes tabix and bgzip
   - minimap2>=2.23
   - deepsignal-plant=0.1.6
-  - ont-tombo>=1.5.1
+  - pip:
+    - ont-tombo==1.5.1  # using conda to install tombo causes conflicts?
