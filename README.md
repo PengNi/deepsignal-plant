@@ -31,7 +31,6 @@ export HDF5_PLUGIN_PATH=/abslolute/path/to/ont-vbz-hdf-plugin-1.0.1-Linux/usr/lo
 References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [tombo issue #254](https://github.com/nanoporetech/tombo/issues/254), and [vbz_compression issue #5](https://github.com/nanoporetech/vbz_compression/issues/5).
 
 
-
 ## Contents
 - [Installation](#Installation)
 - [Trained models](#Trained-models)
@@ -52,7 +51,18 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [scikit-learn](https://scikit-learn.org/stable/) \
        [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.11.0)
 
-#### 1. Create an environment
+#### 1. One-step installation
+Install deepsignal-plant, its dependencies, and [tombo](https://github.com/nanoporetech/tombo) in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
+
+```shell
+conda env create --name deepsignalpenv -f environment.yml
+
+# then the environment can be activated to use
+conda activate deepsignalpenv
+```
+
+#### 2. Step-by-step installation
+##### (1) create an environment
 We highly recommend using a virtual environment for the installation of deepsignal-plant and its dependencies. A virtual environment can be created and (de)activated as follows using [conda](https://conda.io/docs/):
 ```bash
 # create
@@ -66,8 +76,8 @@ conda deactivate
 ```
 The virtual environment can also be created using [virtualenv](https://github.com/pypa/virtualenv/).
 
-#### 2. Install deepsignal-plant
-- After the environment being created and activated, deepsignal-plant can be installed using [conda](https://anaconda.org/bioconda/deepsignal-plant)/[pip](https://pypi.org/project/deepsignal-plant/), or from github directly:
+##### (2) Install deepsignal-plant
+After the environment being created and activated, deepsignal-plant can be installed using [conda](https://anaconda.org/bioconda/deepsignal-plant)/[pip](https://pypi.org/project/deepsignal-plant/), or from github directly:
 ```bash
 # install using conda
 conda install -c bioconda deepsignal-plant
@@ -81,7 +91,8 @@ cd deepsignal-plant
 python setup.py install
 ```
 
-- [PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
+##### (3) Re-install pytorch if needed
+[PyTorch](https://pytorch.org/) can be automatically installed during the installation of deepsignal-plant. However, if the version of [PyTorch](https://pytorch.org/) installed is not appropriate for your OS, an appropriate version should be re-installed in the same environment as the [instructions](https://pytorch.org/get-started/locally/):
 ```bash
 # install using conda
 conda install pytorch==1.11.0 cudatoolkit=10.2 -c pytorch
@@ -90,7 +101,8 @@ conda install pytorch==1.11.0 cudatoolkit=10.2 -c pytorch
 pip install torch==1.11.0
 ```
 
-- [tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
+##### (4) Install tombo
+[tombo (version 1.5.1)](https://github.com/nanoporetech/tombo) is required to be installed in the same environment:
 ```bash
 # install using conda
 conda install -c bioconda ont-tombo
@@ -99,7 +111,9 @@ conda install -c bioconda ont-tombo
 pip install ont-tombo
 ```
 
-- Guppy (version>=3.6.1) is also required, which can be downloaded from [Nanopore Community (login required)](https://nanoporetech.com/community).
+**Note:**
+
+Guppy (version>=3.6.1) is also required, which can be downloaded from [Nanopore Community (login required)](https://nanoporetech.com/community).
 
 
 ## Trained models
