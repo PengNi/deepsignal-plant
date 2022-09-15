@@ -317,8 +317,9 @@ def _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioni
         base_signal_lens.append(signal_lens)
         k_signals.append(kmer_base_signals)
         labels.append(f_methy_label)
-    features_batches.append((sampleinfo, kmers, base_means, base_stds,
-                             base_signal_lens, k_signals, labels))
+    if len(sampleinfo) > 0:
+        features_batches.append((sampleinfo, kmers, base_means, base_stds,
+                                 base_signal_lens, k_signals, labels))
     return features_batches, error
 
 
