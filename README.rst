@@ -8,6 +8,8 @@ Release
 -----
 optimize/test more on multi-gpu support in call_mods module
 
+add scipy==1.7.3 in requirements (floating point error in scipy>=1.9->tombo). fix this in deepsignal-plant, although tombo only is the pre-process tool for this tool.
+
 
 0.1.6
 -----

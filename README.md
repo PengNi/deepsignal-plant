@@ -44,12 +44,15 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [Python3.*](https://www.python.org/) (version>=3.8)\
        [Guppy](https://nanoporetech.com/community) (version>=3.6.1)\
        [tombo](https://github.com/nanoporetech/tombo) (version 1.5.1)
-   - Dependencies: \
+   - Direct dependencies: \
        [numpy](http://www.numpy.org/) \
        [h5py](https://github.com/h5py/h5py) \
        [statsmodels](https://github.com/statsmodels/statsmodels/) \
        [scikit-learn](https://scikit-learn.org/stable/) \
        [PyTorch](https://pytorch.org/) (version >=1.2.0, <=1.11.0)
+   - Non-direct dependencies: \
+       [scipy](https://scipy.org/) \
+       [pandas](https://pandas.pydata.org/)
 
 #### Option 1. One-step installation
 Install deepsignal-plant, its dependencies, and other required packages in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
