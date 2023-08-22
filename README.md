@@ -4,7 +4,7 @@
 [![GitHub-License](https://img.shields.io/github/license/PengNi/deepsignal-plant)](https://github.com/PengNi/deepsignal-plant/blob/master/LICENSE)
 
 [![PyPI-version](https://img.shields.io/pypi/v/deepsignal-plant)](https://pypi.org/project/deepsignal-plant/)
-[![PyPI-Downloads](https://pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
+[![PyPI-Downloads](https://static.pepy.tech/badge/deepsignal-plant)](https://pepy.tech/project/deepsignal-plant)
 &emsp;[![Conda-version](https://img.shields.io/conda/vn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
 [![Conda-Downloads](https://img.shields.io/conda/dn/bioconda/deepsignal-plant)](https://anaconda.org/bioconda/deepsignal-plant)
 <!--[![PyPI-Downloads/m](https://pepy.tech/badge/deepsignal-plant/month)](https://pepy.tech/project/deepsignal-plant)-->
