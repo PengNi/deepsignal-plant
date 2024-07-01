@@ -1,5 +1,6 @@
 import os
 import argparse
+import gzip
 
 
 basepairs = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N',
@@ -63,7 +64,7 @@ def get_c_motif2seq():
 
 
 def _split_callmods_file(callmods_file):
-    fname, fext = os.path.splitext(callmods_file)
+    fname, fext = os.path.splitext(callmods_file) if not callmods_file.endswith(".gz") else os.path.splitext(callmods_file[:-3])
 
     motif2seq = get_c_motif2seq()
     motifs = list(motif2seq.keys())
@@ -84,19 +85,22 @@ def _split_callmods_file(callmods_file):
 
     count, count_fail = 0, 0
     # call_mods.tsv
-    with open(callmods_file, "r") as rf:
-        for line in rf:
-            count += 1
-            words = line.strip().split("\t")
-            kmer = words[-1]
-            cenpos = len(kmer)//2
-            seq = kmer[cenpos:(cenpos+3)]
-            try:
-                wfobjs[motif2idx[seq2motif[seq]]].write(line)
-            except KeyError:
-                count_fail += 1
-                print("seq: {}, line: {}".format(seq, line.strip()))
-
+    if callmods_file.endswith(".gz"):
+        rf = gzip.open(callmods_file, "rt")
+    else:
+        rf = open(callmods_file, "r")
+    for line in rf:
+        count += 1
+        words = line.strip().split("\t")
+        kmer = words[-1]
+        cenpos = len(kmer)//2
+        seq = kmer[cenpos:(cenpos+3)]
+        try:
+            wfobjs[motif2idx[seq2motif[seq]]].write(line)
+        except KeyError:
+            count_fail += 1
+            print("seq: {}, line: {}".format(seq, line.strip()))
+    rf.close()
     for wf in wfobjs:
         wf.flush()
         wf.close()
