@@ -9,7 +9,7 @@ use_cuda = torch.cuda.is_available()
 # FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 def FloatTensor(tensor, device=0):
     if use_cuda:
-        return torch.tensor(tensor, dtype=torch.float, device='cuda:{}'.format(device))
+        return tensor.clone().detach().to(device=f'cuda:{device}', dtype=torch.float)
     return torch.tensor(tensor, dtype=torch.float)
 
 
