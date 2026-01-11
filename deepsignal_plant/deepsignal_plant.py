@@ -6,52 +6,59 @@ import argparse
 
 from .utils.process_utils import str2bool
 from .utils.process_utils import display_args
+from .utils.process_utils import detect_file_type
 
 from ._version import DEEPSIGNAL_PLANT_VERSION
 
 
 def main_extraction(args):
-    from .extract_features import extract_features
-
-    display_args(args)
-
-    fast5_dir = args.fast5_dir
+    input_dir = args.input_dir
     is_recursive = str2bool(args.recursively)
+    file_type = detect_file_type(input_dir, is_recursive)
+    if file_type == 'fast5':
+        from .extract_features import extract_features
 
-    corrected_group = args.corrected_group
-    basecall_subgroup = args.basecall_subgroup
-    normalize_method = args.normalize_method
+        display_args(args)    
 
-    reference_path = args.reference_path
-    is_dna = str2bool(args.is_dna)
-    write_path = args.write_path
-    w_is_dir = str2bool(args.w_is_dir)
-    w_batch_num = args.w_batch_num
+        corrected_group = args.corrected_group
+        basecall_subgroup = args.basecall_subgroup
+        normalize_method = args.normalize_method
 
-    kmer_len = args.seq_len
-    signals_len = args.signal_len
-    motifs = args.motifs
-    mod_loc = args.mod_loc
-    methy_label = args.methy_label
-    position_file = args.positions
-    regionstr = args.region
-
-    nproc = args.nproc
-    f5_batch_size = args.f5_batch_size
-
-    is_gzip = args.gzip
-
-    extract_features(fast5_dir, is_recursive, reference_path, is_dna,
-                     f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
-                     normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
-                     position_file, regionstr, w_is_dir, w_batch_num, is_gzip)
-
+        reference_path = args.reference_path
+        is_dna = str2bool(args.is_dna)
+        write_path = args.write_path
+        w_is_dir = str2bool(args.w_is_dir)
+        w_batch_num = args.w_batch_num
+        kmer_len = args.seq_len
+        signals_len = args.signal_len
+        motifs = args.motifs
+        mod_loc = args.mod_loc
+        methy_label = args.methy_label
+        position_file = args.positions
+        regionstr = args.region
+        nproc = args.nproc
+        f5_batch_size = args.f5_batch_size
+        is_gzip = args.gzip
+        extract_features(input_dir, is_recursive, reference_path, is_dna,
+                    f5_batch_size, write_path, nproc, corrected_group, basecall_subgroup,
+                    normalize_method, motifs, mod_loc, kmer_len, signals_len, methy_label,
+                    position_file, regionstr, w_is_dir, w_batch_num, is_gzip)
+    else:
+        from .extract_features_pod5 import extract_features
+        extract_features(args)
 
 def main_call_mods(args):
-    from .call_modifications import call_mods
+    input_dir = args.input_path
+    is_recursive = str2bool(args.recursively)
+    file_type = detect_file_type(input_dir, is_recursive)
+    if file_type == 'fast5':
+        from .call_modifications import call_mods
 
-    display_args(args)
-    call_mods(args)
+        display_args(args)
+        call_mods(args)
+    else:
+        from .call_modifications import call_mods_pod5
+        call_mods_pod5(args)
 
 
 def main_call_freq(args):
@@ -118,12 +125,13 @@ def main():
 
     # sub_extract ============================================================================
     se_input = sub_extract.add_argument_group("INPUT")
-    se_input.add_argument("--fast5_dir", "-i", action="store", type=str,
+    se_input.add_argument("--input_dir", "-i", action="store", type=str,
                           required=True,
-                          help="the directory of fast5 files")
+                          help="the directory of fast5/pod5 files")
+    se_input.add_argument("--bam", type=str, help="the bam filepath")
     se_input.add_argument("--recursively", "-r", action="store", type=str, required=False,
                           default='yes',
-                          help='is to find fast5 files from fast5_dir recursively. '
+                          help='is to find fast5/pod5 files from fast5_dir/pod5_dir recursively. '
                                'default true, t, yes, 1')
     se_input.add_argument("--corrected_group", action="store", type=str, required=False,
                           default='RawGenomeCorrected_000',
@@ -206,8 +214,9 @@ def main():
     sc_input.add_argument("--input_path", "-i", action="store", type=str,
                           required=True,
                           help="the input path, can be a signal_feature file from extract_features.py, "
-                               "or a directory of fast5 files. If a directory of fast5 files is provided, "
-                               "args in FAST5_EXTRACTION should be provided.")
+                               "or a directory of fast5/pod5 files. If a directory of fast5/pod5 files is provided, "
+                               "if use fast5, args in FAST5_EXTRACTION should be provided.")
+    sc_input.add_argument("--bam", type=str, help="the bam filepath")
     sc_input.add_argument("--f5_batch_size", action="store", type=int, default=30,
                           required=False,
                           help="number of reads/files to be processed by each process one time, default 30")
@@ -277,10 +286,10 @@ def main():
                        default="mad", required=False,
                        help="the way for normalizing signals in read level. "
                             "mad or zscore, default mad")
-    # sc_f5.add_argument("--methy_label", action="store", type=int,
-    #                    choices=[1, 0], required=False, default=1,
-    #                    help="the label of the interested modified bases, this is for training."
-    #                         " 0 or 1, default 1")
+    sc_f5.add_argument("--methy_label", action="store", type=int,
+                       choices=[1, 0], required=False, default=1,
+                       help="the label of the interested modified bases, this is for training."
+                            " 0 or 1, default 1")
     sc_f5.add_argument("--motifs", action="store", type=str,
                        required=False, default='CG',
                        help='motif seq to be extracted, default: CG. '
