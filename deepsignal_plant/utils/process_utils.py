@@ -12,6 +12,8 @@ import multiprocessing.queues
 import numpy as np
 import gc
 import math
+from typing import Union, Tuple, List
+import logging
 
 basepairs = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A', 'N': 'N',
              'W': 'W', 'S': 'S', 'M': 'K', 'K': 'M', 'R': 'Y',
@@ -50,6 +52,125 @@ iupac_alphabets_rna = {'A': ['A'], 'C': ['C'], 'G': ['G'], 'U': ['U'],
 
 nproc_to_call_mods_in_cpu_mode = 2
 
+key_sep = "||"
+log_fmt = "%(asctime)s - %(levelname)s - %(message)s"
+log_datefmt = "%Y-%m-%d %H:%M:%S"
+log_formatter = logging.Formatter(log_fmt, log_datefmt)
+
+def get_logger(module="", level=logging.DEBUG):
+    logger = logging.getLogger(module)
+    logger.setLevel(level)
+
+    # fh = logging.FileHandler(LOG_FN)
+    # fh.setLevel(level)
+    # fh.setFormatter(log_formatter)
+    sh = logging.StreamHandler()
+    sh.setLevel(level)
+    sh.setFormatter(log_formatter)
+
+    # logger.addHandler(fh)
+    logger.addHandler(sh)
+    return logger
+
+def fill_files_queue(files_q, files, batch_size=1, is_single=False):
+    batch_size_tmp = 1 if not is_single else batch_size
+    for i in np.arange(0, len(files), batch_size_tmp):
+        if isinstance(files_q, list):
+            files_q.append(files[i : (i + batch_size_tmp)])
+        else:
+            files_q.put(files[i : (i + batch_size_tmp)])
+    return
+def read_position_file(position_file):
+    postions = set()
+    with open(position_file, "r") as rf:
+        for line in rf:
+            words = line.strip().split("\t")
+            postions.add(key_sep.join(words[:3]))
+    return postions
+def detect_file_type(path, recursive=True):
+    """检测目录中主要的文件类型，返回 'pod5', 'slow5', 'fast5' 或 None"""
+    if os.path.isfile(path):
+        if path.endswith('.pod5'):
+            return 'pod5'
+        elif path.endswith('.slow5') or path.endswith('.blow5'):
+            return 'slow5'
+        elif path.endswith('.fast5'):
+            return 'fast5'
+        else:
+            return None
+    elif os.path.isdir(path):
+        file_counts = {'pod5': 0, 'slow5': 0, 'fast5': 0}
+        for root, _, files in os.walk(path):
+            for fname in files:
+                if fname.endswith('.pod5'):
+                    file_counts['pod5'] += 1
+                    break
+                elif fname.endswith('.slow5') or fname.endswith('.blow5'):
+                    file_counts['slow5'] += 1
+                    break
+                elif fname.endswith('.fast5'):
+                    file_counts['fast5'] += 1
+                    break
+            #if not recursive:
+            break
+        if file_counts['pod5'] > 0 and file_counts['slow5'] == 0 and file_counts['fast5'] == 0:
+            return 'pod5'
+        elif file_counts['slow5'] > 0 and file_counts['pod5'] == 0 and file_counts['fast5'] == 0:
+            return 'slow5'
+        elif file_counts['fast5'] > 0 and file_counts['pod5'] == 0 and file_counts['slow5'] == 0:
+            return 'fast5'
+        elif sum(file_counts.values()) == 0:
+            return None
+        else:
+            raise ValueError(f"Directory {path} contains mixed file types: {file_counts}")
+    else:
+        raise ValueError(f"Path {path} is neither a file nor a directory")
+def get_files(input_path: str, is_recursive: bool = True, file_type: Union[str, Tuple[str, ...]] = ".fast5") -> List[str]:
+    """
+    获取指定路径中匹配文件类型的文件列表，支持单个文件或目录。
+    
+    Args:
+        input_path (str): 输入路径（可以是文件或目录）
+        is_recursive (bool): 是否递归查找（仅对目录有效），默认 True
+        file_type (str or tuple): 文件扩展名，单一字符串（如 '.fast5'）或元组（如 ('.slow5', '.blow5')）
+    
+    Returns:
+        List[str]: 匹配的文件路径列表
+    """
+    input_path = os.path.abspath(input_path)
+    inputs = []
+    
+    # 将 file_type 转换为元组，确保统一处理
+    if isinstance(file_type, str):
+        file_types = (file_type,)
+    else:
+        file_types = file_type
+    
+    # 如果是文件，直接检查是否匹配
+    if os.path.isfile(input_path):
+        for ext in file_types:
+            if input_path.endswith(ext):
+                inputs.append(input_path)
+                break
+    # 如果是目录，按递归或非递归方式处理
+    elif os.path.isdir(input_path):
+        if is_recursive:
+            for root, _, filenames in os.walk(input_path):
+                for ext in file_types:
+                    for filename in fnmatch.filter(filenames, "*" + ext):
+                        file_path = os.path.join(root, filename)
+                        inputs.append(file_path)
+        else:
+            for file_name in os.listdir(input_path):
+                for ext in file_types:
+                    if file_name.endswith(ext):
+                        file_path = os.path.join(input_path, file_name)
+                        inputs.append(file_path)
+                        break
+    else:
+        raise ValueError(f"Input path {input_path} is neither a file nor a directory")
+    
+    return inputs
 
 def str2bool(v):
     # susendberg's function
