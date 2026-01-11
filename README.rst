@@ -4,6 +4,11 @@ deepsignal-plant
 
 Release
 -------
+0.1.8
+-----
+add pod5/slow5/blow5 and bam interface and r10.4.1(5khz) model
+
+
 0.1.7
 -----
 optimize/test more on multi-gpu support in call_mods module
