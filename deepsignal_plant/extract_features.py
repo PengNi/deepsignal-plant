@@ -658,7 +658,7 @@ def main():
                                                 "or a group of flowcells a time, "
                                                 "if the whole data is extremely large.")
     ep_input = extraction_parser.add_argument_group("INPUT")
-    ep_input.add_argument("--fast5_dir", "-i", action="store", type=str,
+    ep_input.add_argument("--input_dir", "-i", action="store", type=str,
                           required=True,
                           help="the directory of fast5 files")
     ep_input.add_argument("--recursively", "-r", action="store", type=str, required=False,
@@ -742,7 +742,7 @@ def main():
     extraction_args = extraction_parser.parse_args()
     display_args(extraction_args)
 
-    fast5_dir = extraction_args.fast5_dir
+    fast5_dir = extraction_args.input_dir
     is_recursive = str2bool(extraction_args.recursively)
 
     corrected_group = extraction_args.corrected_group
