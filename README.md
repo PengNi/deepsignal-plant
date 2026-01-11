@@ -212,8 +212,12 @@ Features of targeted sites can be extracted for training or testing.
 
 For the example data (By default, deepsignal-plant extracts 13-mer-seq and 13*16-signal features of each CpG motif in reads. Note that the value of *--corrected_group* must be the same as that of *--corrected-group* in [tombo](https://github.com/nanoporetech/tombo).):
 ```bash
-# extract features of all Cs
-deepsignal_plant extract -i fast5s \
+# extract features of all Cs, fast5 files as input
+deepsignal_plant extract -i fast5s/ \
+  -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 \
+  --nproc 30 --motifs C
+# extract features of all Cs, pod5/slow5/blow5 files and bam as input
+deepsignal_plant extract -i pod5s/ --bam demo.bam \
   -o fast5s.C.features.tsv --corrected_group RawGenomeCorrected_000 \
   --nproc 30 --motifs C
 ```
@@ -261,6 +265,12 @@ CUDA_VISIBLE_DEVICES=-1 deepsignal_plant call_mods --input_path fast5s/ \
   --motifs C --nproc 30
 # fast5 files as input, use GPU
 CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path fast5s/ \
+  --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
+  --result_file fast5s.C.call_mods.tsv \
+  --corrected_group RawGenomeCorrected_000 \
+  --motifs C --nproc 30 --nproc_gpu 6
+# pod5/slow5/blow5 files and bam as input, use GPU
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods --input_path pod5s/ --bam demo.bam \
   --model_path model.dp2.CNN.arabnrice2-1_120m_R9.4plus_tem.bn13_sn16.both_bilstm.epoch6.ckpt \
   --result_file fast5s.C.call_mods.tsv \
   --corrected_group RawGenomeCorrected_000 \
