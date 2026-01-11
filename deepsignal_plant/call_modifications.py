@@ -27,6 +27,7 @@ from .utils.process_utils import code2base_dna
 from .utils.process_utils import str2bool
 from .utils.process_utils import display_args
 from .utils.process_utils import nproc_to_call_mods_in_cpu_mode
+from .utils.process_utils import get_files,get_motif_seqs,read_position_file,detect_file_type
 
 from .extract_features import _extract_features
 from .extract_features import _extract_preprocess_
@@ -35,7 +36,13 @@ from .extract_features import _extract_preprocess_fast5sinfo
 from .utils.constants_torch import FloatTensor
 from .utils.constants_torch import use_cuda
 
+from torch.utils.data import DataLoader
+from .utils_dataloader import SignalDataset, pod5_producer
+from .utils_dataloader import collate_fn_inference, worker_init_fn
+
 import uuid
+
+from .utils import bam_reader
 
 if use_cuda:
     # from .utils.process_utils import MyQueue as Queue
@@ -178,7 +185,7 @@ def _call_mods(features_batch, model, batch_size, device=0):
                 prob_0_norm = round(prob_0 / (prob_0 + prob_1), 6)
                 prob_1_norm = round(1 - prob_0_norm, 6)
                 # kmer-5
-                b_idx_kmer = ''.join([code2base_dna[x] for x in b_kmers[idx]])
+                b_idx_kmer = ''.join([code2base_dna[int(x)] for x in b_kmers[idx]])
                 center_idx = int(np.floor(len(b_idx_kmer) / 2))
                 bkmer_start = center_idx - 2 if center_idx - 2 >= 0 else 0
                 bkmer_end = center_idx + 3 if center_idx + 3 <= len(b_idx_kmer) else len(b_idx_kmer)
@@ -638,7 +645,128 @@ def call_mods(args):
     if os.path.exists(success_file):
         os.remove(success_file)
     print("[main] call_mods costs %.2f seconds.." % (time.time() - start))
+def determine_process_count(world_size,args):
+    if use_cuda:
+        return max(1, args.nproc//world_size)
+    return max(1, args.nproc//world_size)
+def _call_mods_pod5(rank, args, pred_str_q, data_queue, motif_seqs, positions):
+    # CUDA 绑定
+    use_cuda = torch.cuda.is_available()
+    if use_cuda:
+        torch.cuda.set_device(rank)
 
+    # ⚠️ 每个进程自己打开 BAM（不能跨进程传）
+    bam_index = bam_reader.ReadIndexedBam(args.bam)
+
+    dataset = SignalDataset(
+        data_queue=data_queue,
+        bam_index=bam_index,
+        motif_seqs=motif_seqs,
+        positions=positions,
+        args=args,
+        device=rank if use_cuda else "cpu"
+    )
+
+    data_loader = DataLoader(
+        dataset,
+        batch_size=args.batch_size,
+        num_workers=0,
+        collate_fn=collate_fn_inference,
+        pin_memory=True,   # num_workers=0 时没意义
+    )
+
+    model = ModelBiLSTM(
+        args.seq_len, args.signal_len,
+        args.layernum1, args.layernum2,
+        args.class_num, args.dropout_rate,
+        args.hid_rnn, args.n_vocab,
+        args.n_embed,
+        str2bool(args.is_base),
+        str2bool(args.is_signallen),
+        module=args.model_type,
+        device=rank
+    )
+
+    para_dict = torch.load(args.model_path, map_location="cpu")
+    model.load_state_dict({**model.state_dict(), **para_dict})
+
+    if use_cuda:
+        model.cuda(rank)
+
+    model.eval()
+    print(f"[GPU-{rank}] pid={os.getpid()} started", flush=True)
+    accuracy_list = []
+    batch_num_total = 0
+    with torch.no_grad():
+        for batch in data_loader:
+            if batch is None:
+                continue
+
+            pred_str, accuracy, batch_num = _call_mods(
+                batch, model, args.batch_size, rank
+            )
+            pred_str_q.put(pred_str)
+            while pred_str_q.qsize() > queue_size_border:
+                time.sleep(time_wait)
+            accuracy_list.append(accuracy)
+            batch_num_total += batch_num
+    print('call_mods process-{} ending, proceed {} feature-batches({})'.format(os.getpid(), batch_num_total,
+                                                                               args.batch_size))
+    print(f"[GPU-{rank}] finished", flush=True)
+    
+
+def call_mods_pod5(args):
+    mp.set_start_method("spawn", force=True)
+    mp.set_sharing_strategy("file_system")
+
+    is_dna = args.is_dna
+    is_recursive = str2bool(args.recursively)
+
+    motif_seqs = get_motif_seqs(args.motifs, is_dna)
+    positions = read_position_file(args.positions) if args.positions else None
+    file_type = detect_file_type(args.input_path, is_recursive)
+    files_dr = get_files(args.input_path, is_recursive, file_type)
+
+    # writer
+    pred_str_q = mp.Queue()
+    p_writer = mp.Process(
+        target=_write_predstr_to_file,
+        args=(args.result_file, pred_str_q, args.gzip),
+        name="writer"
+    )
+    p_writer.start()
+
+    # GPU workers
+    num_gpu = torch.cuda.device_count()
+    data_queues = mp.Queue(maxsize=10)
+    gpu_procs = []
+
+    for rank in range(num_gpu):
+        p = mp.Process(
+            target=_call_mods_pod5,
+            args=(rank, args, pred_str_q, data_queues, motif_seqs, positions),
+            name=f"gpu-{rank}"
+        )
+        p.start()
+        gpu_procs.append(p)
+
+    # producer
+    p_producer = mp.Process(
+        target=pod5_producer,
+        args=(files_dr, data_queues,num_gpu, file_type),
+        name="producer"
+    )
+    p_producer.start()
+
+    # join
+    p_producer.join()
+    for p in gpu_procs:
+        p.join()
+
+    pred_str_q.put("kill")
+    p_writer.join()
+
+    print("[Main] all done", flush=True)
 
 def main():
     parser = argparse.ArgumentParser("call modifications")
@@ -647,8 +775,9 @@ def main():
     p_input.add_argument("--input_path", "-i", action="store", type=str,
                          required=True,
                          help="the input path, can be a signal_feature file from extract_features.py, "
-                              "or a directory of fast5 files. If a directory of fast5 files is provided, "
-                              "args in FAST5_EXTRACTION should be provided.")
+                              "or a directory of fast5/pod5 files. If a directory of fast5/pod5 files is provided, "
+                              "if use fast5, args in FAST5_EXTRACTION should be provided.")
+    p_input.add_argument("--bam", type=str, help="the bam filepath")
     p_input.add_argument("--f5_batch_size", action="store", type=int, default=30,
                          required=False,
                          help="number of reads/files to be processed by each process one time, default 30")
@@ -718,10 +847,10 @@ def main():
                       default="mad", required=False,
                       help="the way for normalizing signals in read level. "
                            "mad or zscore, default mad")
-    # p_f5.add_argument("--methy_label", action="store", type=int,
-    #                   choices=[1, 0], required=False, default=1,
-    #                   help="the label of the interested modified bases, this is for training."
-    #                        " 0 or 1, default 1")
+    p_f5.add_argument("--methy_label", action="store", type=int,
+                      choices=[1, 0], required=False, default=1,
+                      help="the label of the interested modified bases, this is for training."
+                           " 0 or 1, default 1")
     p_f5.add_argument("--motifs", action="store", type=str,
                       required=False, default='CG',
                       help='motif seq to be extracted, default: CG. '
@@ -761,8 +890,10 @@ def main():
 
     args = parser.parse_args()
     display_args(args)
-
-    call_mods(args)
+    if args.bam is None:
+        call_mods(args)
+    else:
+        call_mods_pod5(args)
 
 
 if __name__ == '__main__':
