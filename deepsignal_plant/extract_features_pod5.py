@@ -34,7 +34,8 @@ from .utils import bam_reader
 
 from collections import namedtuple
 from .utils.process_utils import get_logger
-import pod5
+# pod5 is lazily imported inside functions that use it to avoid loading
+# its native library in every subprocess (resource exhaustion)
 from .extract_features import _get_signals_rect
 from .extract_features import _write_featurestr
 
@@ -309,13 +310,14 @@ def process_sig_seq(
     nproc_extract=1,
     process_chr=None,
 ):
+    import pod5 as _pod5
     LOGGER.info("extract_features process-{} starts".format(os.getpid()))
     while True:
         pod5_file = pod5s_q.get()
         if pod5_file == "kill":
             pod5s_q.put("kill")
             break
-        with pod5.Reader(pod5_file[0]) as reader:
+        with _pod5.Reader(pod5_file[0]) as reader:
             for read_record in reader.reads():
                 while (
                     feature_Q.qsize() > (nproc_extract if nproc_extract > 1 else 2) * 3

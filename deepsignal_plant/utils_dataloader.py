@@ -4,8 +4,8 @@ import numpy as np
 from torch.utils.data import IterableDataset, get_worker_info
 import torch.distributed as dist
 
-import pod5
-import pyslow5
+# pod5 and pyslow5 are lazily imported inside pod5_producer to avoid
+# loading their native libraries in every subprocess (resource exhaustion)
 from .utils.process_utils import base2code_dna,key_sep
 from .utils.process_utils import get_logger
 from .utils.process_utils import get_refloc_of_methysite_in_motif
@@ -27,10 +27,15 @@ def pod5_producer(files_dr, data_queue, num_consumers, format_type):
     # pod5s_list = []
     # fill_files_queue(pod5s_list, files_dr) 
     
+    if format_type == 'pod5':
+        import pod5 as _pod5
+    elif format_type == 'slow5':
+        import pyslow5 as _pyslow5
+
     for file in files_dr:
         try:
             if format_type == 'pod5':
-                with pod5.Reader(file) as reader:
+                with _pod5.Reader(file) as reader:
                     #LOGGER.debug("pod5 file: {}".format(file))
                     for read_record in reader.reads():
                         #LOGGER.debug("read_record")
@@ -47,8 +52,7 @@ def pod5_producer(files_dr, data_queue, num_consumers, format_type):
                         # except KeyError:
                         #     continue
             elif format_type == 'slow5':
-                        
-                with pyslow5.Open(file, 'r') as reader:
+                with _pyslow5.Open(file, 'r') as reader:
                     for read_record in reader.seq_reads():
                         read_name = str(read_record['read_id'])
                         data_queue.put((read_name,read_record['signal'].copy()))

@@ -9,12 +9,12 @@ use_cuda = torch.cuda.is_available()
 # FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 def FloatTensor(tensor, device=0):
     if use_cuda:
-        return tensor.clone().detach().to(device=f'cuda:{device}', dtype=torch.float)
-    return torch.tensor(tensor, dtype=torch.float)
+        return torch.as_tensor(tensor, dtype=torch.float, device=f'cuda:{device}')
+    return torch.as_tensor(tensor, dtype=torch.float)
 
 
 # LongTensor = torch.cuda.LongTensor if use_cuda else torch.LongTensor
 def LongTensor(tensor, device=0):
     if use_cuda:
-        return torch.tensor(tensor, dtype=torch.long, device='cuda:{}'.format(device))
-    return torch.tensor(tensor, dtype=torch.long)
+        return torch.as_tensor(tensor, dtype=torch.long, device=f'cuda:{device}')
+    return torch.as_tensor(tensor, dtype=torch.long)
