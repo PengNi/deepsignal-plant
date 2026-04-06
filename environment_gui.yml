@@ -1,0 +1,25 @@
+# Minimal conda environment for the DeepSignal-plant Streamlit GUI.
+#
+# The GUI (gui/app.py) calls deepsignal_plant and other tools as subprocesses
+# via the shell — it does NOT import any of their Python libraries.
+# Therefore this environment needs only streamlit and nothing else.
+#
+# Usage:
+#   conda env create -f environment_gui.yml
+#   conda activate deepsignal-gui
+#   streamlit run gui/app.py
+#
+# The deepsignal_plant commands will run inside the *other* environment
+# (deepsignalpenv) because they are invoked as shell commands, not imports.
+# Make sure deepsignalpenv is activated in the shell that runs the GUI,
+# OR configure the full path to each tool in the GUI settings.
+#
+name: deepsignal-gui
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.9
+  - pip
+  - pip:
+    - streamlit>=1.32.0

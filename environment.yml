@@ -4,18 +4,22 @@ channels:
   - pytorch
   - conda-forge
 dependencies:
-  - python>=3.8
+  - python>=3.8,<3.12
   - pip
-  - cudatoolkit=10.2  # 10.2 is ok for 1.7.0-1.11.0
-  - numpy>=1.19.2,<1.20  # <1.20 is for tombo
-  - h5py>=2.8.0,<3  # <3 is for tombo
-  - statsmodels>=0.13.2
-  - scikit-learn>=1.0.2
-  - pytorch::pytorch=1.11.0  # add channel prefix (pytorch::) to make sure the cuda version being installed?
-  - scipy=1.7.3
-  - pandas
-  - samtools>=1.12  # will install dependence->htslib, which includes tabix and bgzip
+  - cudatoolkit=10.2          # compatible with pytorch 1.7.0–1.11.0
+  - numpy>=1.19.2,<1.23       # tombo requires <1.20; scipy 1.7.x requires <1.23
+                               # NEVER install streamlit into this env — it can pull numpy>=2
+  - h5py>=2.8.0,<3            # h5py 3.x dropped Python-object arrays used by tombo
+  - statsmodels>=0.13.2,<0.15
+  - scikit-learn>=1.0.2,<1.3  # 1.3+ requires numpy>=1.17 but rebuilt for numpy 2 only in 1.4+
+  - pytorch::pytorch=1.11.0   # pin exact version; channel prefix avoids CPU-only fallback
+  - scipy>=1.7.3,<1.11        # scipy 1.11 dropped numpy<1.23 support
+  - pandas>=1.3.0,<2.0        # pandas 2.x has breaking dtype changes
+  - samtools>=1.12             # brings htslib (tabix, bgzip)
   - minimap2>=2.23
-  - deepsignal-plant=0.1.6
+  - deepsignal-plant>=0.1.6
   - pip:
-    - ont-tombo==1.5.1  # using conda to install tombo causes conflicts?
+    - ont-tombo==1.5.1         # conda install causes conflicts with newer h5py/numpy
+    - pod5
+    - pysam
+    - ont-fast5-api

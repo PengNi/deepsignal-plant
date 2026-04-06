@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile gui/runner.py)",
+      "Bash(python -m py_compile gui/file_browser.py)",
+      "Bash(python -m py_compile gui/app.py)",
+      "Bash(python3 -m py_compile gui/runner.py)",
+      "Bash(python3 -m py_compile gui/file_browser.py)",
+      "Bash(python3 -m py_compile gui/app.py)",
+      "Bash(where python:*)",
+      "Bash(where python3:*)",
+      "Read(//c/Users/15296/anaconda3/**)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Bash(wc -l e:/code/deepsignal-plant-master/gui/*.py)"
+    ]
+  }
+}

@@ -33,6 +33,7 @@ References: [issue #8](https://github.com/PengNi/deepsignal-plant/issues/8), [to
 
 ## Contents
 - [Installation](#Installation)
+- [Web GUI (Streamlit)](#Web-GUI-Streamlit)
 - [Trained models](#Trained-models)
 - [Example data](#Example-data)
 - [Quick start](#Quick-start)
@@ -122,6 +123,126 @@ conda install -c bioconda ont-tombo
 
 Guppy (version>=3.6.1) is also required, which can be downloaded from [Nanopore Community (login required)](https://nanoporetech.com/community).
 
+
+## Web GUI (Streamlit)
+
+A browser-based graphical interface is provided in the `gui/` directory. It covers the complete R9.4.1 and R10.4.1 methylation-calling pipelines, model training, and visualisation alignment — all without typing shell commands.
+
+> **Important:** The GUI environment must be kept **separate** from the compute environment (`deepsignalpenv`). Installing Streamlit into `deepsignalpenv` will upgrade NumPy to 2.x, which breaks scipy, scikit-learn, and h5py at import time. The GUI never imports any scientific library; it only builds shell commands and runs them as subprocesses.
+
+### 1. Install the GUI environment
+
+```bash
+# Clone the repository if you have not already
+git clone https://github.com/PengNi/deepsignal-plant.git
+cd deepsignal-plant
+
+# Create a minimal conda environment for the GUI (Python + Streamlit only)
+conda env create -f environment_gui.yml
+
+# Activate it
+conda activate deepsignal-gui
+```
+
+Alternatively, install into any Python ≥ 3.9 environment with pip:
+
+```bash
+pip install "streamlit>=1.33"
+```
+
+The compute tools (`deepsignal_plant`, `guppy_basecaller`, `dorado`, `tombo`, `samtools`, `minimap2`, `multi_to_single_fast5`) do **not** need to be installed in the GUI environment. They are launched as subprocesses and can live in a separate conda environment (see [Tool environments](#tool-environments) below).
+
+### 2. Launch the GUI
+
+```bash
+conda activate deepsignal-gui
+streamlit run gui/app.py
+```
+
+The app opens at `http://localhost:8501` in your default browser. The sidebar lets you switch between the **R9.4.1 (FAST5 + Tombo)** and **R10.4.1 (POD5/BAM + Dorado)** protocols.
+
+### 3. Pipeline overview
+
+#### R9.4.1 workflow (FAST5 + Tombo)
+
+| Step | Tool | Description |
+|------|------|-------------|
+| 1 (optional) | `multi_to_single_fast5` | Convert multi-read FAST5 → single-read FAST5 |
+| 2 | `guppy_basecaller` | GPU basecalling |
+| 3 | `cat` | Concatenate FASTQ outputs |
+| 4 | `tombo preprocess` | Annotate raw reads with FASTQ basecalls |
+| 5 | `tombo resquiggle` | Signal re-squiggling against the reference |
+| 6 | `deepsignal_plant call_mods` | Per-read 5mC methylation calling |
+| 7 | `deepsignal_plant call_freq` | Aggregate per-site methylation frequency |
+| 8 (optional) | `split_freq_file_by_5mC_motif.py` | Split frequency file into CG / CHG / CHH |
+
+#### R10.4.1 workflow (POD5/BAM + Dorado)
+
+| Step | Tool | Description |
+|------|------|-------------|
+| 1 | `dorado` | Basecalling + move-table BAM output |
+| 2 | `deepsignal_plant call_mods` | Per-read 5mC methylation calling |
+| 3 | `deepsignal_plant call_freq` | Aggregate per-site methylation frequency |
+| 4 (optional) | `split_freq_file_by_5mC_motif.py` | Split frequency file into CG / CHG / CHH |
+
+Each step has an expandable panel with:
+- All relevant parameters (paths, thread counts, model settings, etc.)
+- A preview of the exact shell command that will be run
+- A **▶ Run** button that streams live stdout/stderr output
+- A top-level **▶️ Run full pipeline** button to execute all steps sequentially
+
+The **Training** tab covers `deepsignal_plant extract`, `deepsignal_plant denoise`, and `deepsignal_plant train` for custom model training.
+
+The **Visualisation** tab generates a sorted, indexed BAM via `minimap2 | samtools sort && samtools index` for loading into IGV or UCSC Genome Browser.
+
+### 4. Common settings (sidebar)
+
+Three paths are shared across all pipeline steps and are entered once in the sidebar:
+
+| Field | Description |
+|-------|-------------|
+| **Working directory** | Root output directory |
+| **Reference genome** | `.fa` / `.fna` / `.fasta` reference file |
+| **DeepSignal model** | Pre-trained `.ckpt` model file |
+
+Every path field has a **📁** toggle button that opens an inline file browser. Click **→** to navigate into a subdirectory, **⬆** to go up, **🏠** for the home directory, and **✓ Select this folder** / **✓** (next to a file) to confirm the selection.
+
+### 5. Tool environments
+
+Each tool can be configured individually in the **🛠️ Tool environments** expander (sidebar):
+
+| Mode | When to use |
+|------|-------------|
+| **System** | The tool is already on the current `$PATH` (default) |
+| **Conda** | The tool lives in a named conda environment (e.g. `deepsignalpenv`) |
+| **Path** | Provide the full path to the executable |
+
+When **Conda** mode is selected the GUI wraps every invocation as:
+
+```bash
+conda run --no-capture-output -n <env_name> bash -c '<original command>'
+```
+
+This activates the target environment without requiring `conda activate` in the shell that runs the GUI.
+
+Click **🧪 Test** next to any tool to verify it is accessible — the GUI runs `--version` or `--help` and reports the output.
+
+**Typical setup:** install the GUI in `deepsignal-gui`, install all compute tools in `deepsignalpenv`, then set every tool to **Conda → deepsignalpenv** in the GUI.
+
+### 6. NumPy version compatibility
+
+`deepsignalpenv` must pin NumPy below 1.23 to avoid ABI incompatibilities with scipy 1.7.x, scikit-learn 1.0–1.2, and h5py 2.x. The provided [environment.yml](environment.yml) already includes the correct pins. Never install `streamlit` into `deepsignalpenv`.
+
+```yaml
+# environment.yml (excerpt — critical pins)
+- numpy>=1.19.2,<1.23
+- h5py>=2.8.0,<3
+- scikit-learn>=1.0.2,<1.3
+- scipy>=1.7.3,<1.11
+- pandas>=1.3.0,<2.0
+```
+
+---
 
 ## Trained models
 

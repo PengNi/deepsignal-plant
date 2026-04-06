@@ -1,0 +1,4 @@
+# Requirements for the Streamlit GUI only.
+# Install into a SEPARATE environment from deepsignal-plant's environment.
+# See environment_gui.yml for the recommended conda setup.
+streamlit>=1.32.0
