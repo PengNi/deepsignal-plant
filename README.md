@@ -56,18 +56,39 @@ deepsignal-plant is built on [Python3](https://www.python.org/) and [PyTorch](ht
        [pandas](https://pandas.pydata.org/)
 
 #### Option 1. One-step installation
-Install deepsignal-plant, its dependencies, and other required packages in one step using [conda](https://conda.io/docs/) and [environment.yml](environment.yml):
+
+Choose the environment file that matches your sequencing protocol:
+
+| Protocol | Data format | Environment file | Env name |
+|----------|-------------|------------------|----------|
+| **R9.4.1** | FAST5 + Guppy + Tombo | [environment_r9.yml](environment_r9.yml) | `deepsignalpenv-r9` |
+| **R10.4.1** | POD5/BAM + Dorado | [environment_r10.yml](environment_r10.yml) | `deepsignalpenv-r10` |
+| **Both protocols** | All of the above | [environment.yml](environment.yml) | `deepsignalpenv` |
+
+The R9 and R10 environments differ in two package groups:
+
+- **R9-only packages**: `ont-tombo`, `ont-fast5-api`, and strict `h5py<3` / `numpy<1.23` pins required by Tombo
+- **R10-only packages**: `pod5`, `pysam` (for POD5/BAM I/O)
 
 ```shell
 # download deepsignal-plant
 git clone https://github.com/PengNi/deepsignal-plant.git
+cd deepsignal-plant
 
-# install tools in environment.yml
-conda env create --name deepsignalpenv -f /path/to/deepsignal-plant/environment.yml
+# R9.4.1 users (FAST5 + Guppy + Tombo)
+conda env create -f environment_r9.yml
+conda activate deepsignalpenv-r9
 
-# then the environment can be activated to use
+# R10.4.1 users (POD5 + Dorado) — also install Dorado binary separately
+conda env create -f environment_r10.yml
+conda activate deepsignalpenv-r10
+
+# Both protocols
+conda env create -f environment.yml
 conda activate deepsignalpenv
 ```
+
+> **Dorado** is a standalone binary (not a conda package). Download it from [github.com/nanoporetech/dorado/releases](https://github.com/nanoporetech/dorado/releases) and place it on your `$PATH` (or configure its full path in the GUI Tool environments panel).
 
 #### Option 2. Step-by-step installation
 ##### (1) create an environment
@@ -161,7 +182,69 @@ streamlit run gui/app.py
 
 The app opens at `http://localhost:8501` in your default browser. The sidebar lets you switch between the **R9.4.1 (FAST5 + Tombo)** and **R10.4.1 (POD5/BAM + Dorado)** protocols.
 
-### 3. Pipeline overview
+### 3. Accessing the GUI from a remote server (SSH tunnel)
+
+Streamlit listens on port 8501 of the remote host. You need an SSH tunnel to forward that port to your local browser. Pick the method that matches your client software.
+
+#### Universal command-line (any terminal with SSH)
+
+Run this on your **local machine** — leave it open while using the GUI:
+
+```bash
+ssh -L 8501:localhost:8501 <username>@<hpc-server>
+```
+
+Then open `http://localhost:8501` in your local browser.
+
+To combine the tunnel with the launch command in one step:
+
+```bash
+ssh -L 8501:localhost:8501 <username>@<hpc-server> \
+  "conda activate deepsignal-gui && streamlit run /path/to/deepsignal-plant/gui/app.py"
+```
+
+#### XShell
+
+1. Open **Session Properties → SSH → Tunneling → Add**
+2. Set:
+   - **Type**: Local
+   - **Source port**: `8501`
+   - **Destination**: `localhost:8501`
+3. Connect to the server, then open `http://localhost:8501` in your browser.
+
+#### MobaXterm
+
+1. Open **Tunneling → New SSH tunnel**
+2. Select **Local port forwarding**
+3. Fill in:
+   - **Forwarded port** (local): `8501`
+   - **SSH server**: your HPC hostname
+   - **SSH login**: your username
+   - **Remote server**: `localhost`
+   - **Remote port**: `8501`
+4. Start the tunnel, then open `http://localhost:8501` in your browser.
+
+#### Windows Terminal / PowerShell
+
+Windows Terminal uses the system OpenSSH client. Run in a PowerShell or CMD tab on your **local machine**:
+
+```powershell
+ssh -L 8501:localhost:8501 <username>@<hpc-server>
+```
+
+Then open `http://localhost:8501` in your browser.
+
+> **Tip — custom port:** If port 8501 is already in use on the server, launch Streamlit on a different port and adjust the tunnel accordingly:
+> ```bash
+> # on the server
+> streamlit run gui/app.py --server.port 8502
+> # tunnel (local)
+> ssh -L 8502:localhost:8502 <username>@<hpc-server>
+> # browser
+> http://localhost:8502
+> ```
+
+### 4. Pipeline overview
 
 #### R9.4.1 workflow (FAST5 + Tombo)
 
@@ -195,7 +278,7 @@ The **Training** tab covers `deepsignal_plant extract`, `deepsignal_plant denois
 
 The **Visualisation** tab generates a sorted, indexed BAM via `minimap2 | samtools sort && samtools index` for loading into IGV or UCSC Genome Browser.
 
-### 4. Common settings (sidebar)
+### 5. Common settings (sidebar)
 
 Three paths are shared across all pipeline steps and are entered once in the sidebar:
 
@@ -207,7 +290,7 @@ Three paths are shared across all pipeline steps and are entered once in the sid
 
 Every path field has a **📁** toggle button that opens an inline file browser. Click **→** to navigate into a subdirectory, **⬆** to go up, **🏠** for the home directory, and **✓ Select this folder** / **✓** (next to a file) to confirm the selection.
 
-### 5. Tool environments
+### 6. Tool environments
 
 Each tool can be configured individually in the **🛠️ Tool environments** expander (sidebar):
 
@@ -217,19 +300,23 @@ Each tool can be configured individually in the **🛠️ Tool environments** ex
 | **Conda** | The tool lives in a named conda environment (e.g. `deepsignalpenv`) |
 | **Path** | Provide the full path to the executable |
 
-When **Conda** mode is selected the GUI wraps every invocation as:
+When **Conda** mode is selected, the GUI queries `conda env list --json` to locate the environment's prefix directory, then replaces the bare tool name in the command with its absolute path inside that prefix:
 
-```bash
-conda run --no-capture-output -n <env_name> bash -c '<original command>'
+```
+# Example — bare command:
+CUDA_VISIBLE_DEVICES=0 deepsignal_plant call_mods ...
+
+# Resolved command (no activation needed):
+CUDA_VISIBLE_DEVICES=0 /opt/miniconda3/envs/deepsignalpenv-r9/bin/deepsignal_plant call_mods ...
 ```
 
-This activates the target environment without requiring `conda activate` in the shell that runs the GUI.
+This works because Python entry points carry a shebang line (`#!/<prefix>/bin/python`) that causes the correct interpreter and all libraries in that environment to be used — without any `conda activate` step. This is more reliable than `conda run` or shell-based activation, both of which can fail silently on HPC systems that run non-login, non-interactive shells.
 
-Click **🧪 Test** next to any tool to verify it is accessible — the GUI runs `--version` or `--help` and reports the output.
+Click **🧪 Test** next to any tool to verify it — the output shows the resolved executable path and the result of `--version`/`--help`, making it easy to confirm the correct environment was detected.
 
-**Typical setup:** install the GUI in `deepsignal-gui`, install all compute tools in `deepsignalpenv`, then set every tool to **Conda → deepsignalpenv** in the GUI.
+**Typical setup:** install the GUI in `deepsignal-gui`, install compute tools in `deepsignalpenv-r9` (R9) or `deepsignalpenv-r10` (R10), then set every tool to **Conda** mode pointing to the correct environment.
 
-### 6. NumPy version compatibility
+### 7. NumPy version compatibility
 
 `deepsignalpenv` must pin NumPy below 1.23 to avoid ABI incompatibilities with scipy 1.7.x, scikit-learn 1.0–1.2, and h5py 2.x. The provided [environment.yml](environment.yml) already includes the correct pins. Never install `streamlit` into `deepsignalpenv`.
 

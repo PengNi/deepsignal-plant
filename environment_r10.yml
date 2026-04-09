@@ -1,0 +1,31 @@
+name: deepsignalpenv-r10
+# R10.4.1 workflow: POD5 + Dorado basecalling (no Tombo, no FAST5)
+# Does NOT include ont-tombo / ont-fast5-api (R9-only packages).
+#
+# Usage:
+#   conda env create -f environment_r10.yml
+#   conda activate deepsignalpenv-r10
+#
+# Note: Dorado is a standalone binary — download it separately from
+#   https://github.com/nanoporetech/dorado/releases
+channels:
+  - bioconda
+  - pytorch
+  - conda-forge
+dependencies:
+  - python>=3.8,<3.12
+  - pip
+  - cudatoolkit=10.2
+  - numpy>=1.19.2,<2.0        # avoid numpy 2.x ABI breakage with pytorch 1.11
+  - h5py>=2.8.0               # no strict upper bound without tombo
+  - statsmodels>=0.13.2
+  - scikit-learn>=1.0.2
+  - pytorch::pytorch=1.11.0
+  - scipy>=1.7.3
+  - pandas>=1.3.0,<2.0
+  - samtools>=1.12
+  - minimap2>=2.23
+  - deepsignal-plant>=0.1.6
+  - pip:
+    - pod5                     # POD5 file format I/O
+    - pysam                    # BAM file handling

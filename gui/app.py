@@ -325,25 +325,49 @@ with st.sidebar:
             # ── Value input (full width, shown only when needed) ────────────
             if new_mode == "conda":
                 if _conda_envs:
-                    _options = ["(type below…)"] + _conda_envs
+                    # Selectbox lists discovered envs.  Only show the
+                    # text_input when the user picks "(type manually…)",
+                    # otherwise the selectbox IS the source of truth.
+                    # Never render both simultaneously — the text_input
+                    # would overwrite cfg["value"] with its stale "" state.
+                    cur_val = cfg.get("value", "")
+                    _options = _conda_envs + ["(type manually…)"]
+                    # If current value is not in list (e.g. typed manually
+                    # last time), pre-select "(type manually…)"
+                    if cur_val in _conda_envs:
+                        _sel_idx = _conda_envs.index(cur_val)
+                    else:
+                        _sel_idx = len(_conda_envs)  # last item
+
                     _sel = st.selectbox(
                         "Conda env",
                         _options,
-                        index=_options.index(cfg.get("value", ""))
-                              if cfg.get("value", "") in _options else 0,
+                        index=_sel_idx,
                         key=f"_tenv_sel_{tool_name}",
                         label_visibility="collapsed",
                     )
-                    if _sel != "(type below…)":
+                    if _sel != "(type manually…)":
                         cfg["value"] = _sel
-                new_val = st.text_input(
-                    "Conda env name",
-                    value=cfg.get("value", ""),
-                    key=f"_tenv_val_{tool_name}",
-                    placeholder=_hint,
-                    label_visibility="collapsed",
-                )
-                cfg["value"] = new_val
+                    else:
+                        # Selectbox said "type manually" — show text_input
+                        new_val = st.text_input(
+                            "Conda env name",
+                            value=cur_val if cur_val not in _conda_envs else "",
+                            key=f"_tenv_val_{tool_name}",
+                            placeholder=_hint,
+                            label_visibility="collapsed",
+                        )
+                        cfg["value"] = new_val
+                else:
+                    # conda not detected or no envs — text_input only
+                    new_val = st.text_input(
+                        "Conda env name",
+                        value=cfg.get("value", ""),
+                        key=f"_tenv_val_{tool_name}",
+                        placeholder=_hint,
+                        label_visibility="collapsed",
+                    )
+                    cfg["value"] = new_val
             elif new_mode == "path":
                 new_val = st.text_input(
                     "Executable path",

@@ -716,6 +716,7 @@ def _call_mods_pod5(rank, args, pred_str_q, data_queue, motif_seqs, positions):
     
 
 def call_mods_pod5(args):
+    start = time.time()
     mp.set_start_method("spawn", force=True)
     mp.set_sharing_strategy("file_system")
 
@@ -765,7 +766,7 @@ def call_mods_pod5(args):
 
     pred_str_q.put("kill")
     p_writer.join()
-
+    print("[main] call_mods costs %.2f seconds.." % (time.time() - start))
     print("[Main] all done", flush=True)
 
 def main():
