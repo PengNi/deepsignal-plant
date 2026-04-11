@@ -360,8 +360,14 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
         errornum_q.put(error)
         for features_batch in features_batches:
             features_batch_q.put(features_batch)
+        _backpressure_wait = 0
         while features_batch_q.qsize() > queue_size_border_f5batch:
             time.sleep(time_wait)
+            _backpressure_wait += time_wait
+            if _backpressure_wait > 300:
+                print("[WARNING] process-{} backpressure timeout (300s): "
+                      "downstream consumer may be dead, stopping".format(os.getpid()))
+                return
     print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
@@ -432,6 +438,14 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         while not errornum_q.empty():
             errornum_sum += errornum_q.get()
         if not running:
+            break
+        # if all downstream GPU/write consumers died, unblock feature procs
+        consumers_alive = (any(p.is_alive() for p in call_mods_gpu_procs)
+                           and p_w.is_alive())
+        if not consumers_alive:
+            print("[WARNING] downstream consumer processes died, terminating feature procs")
+            for p in features_batch_procs:
+                p.terminate()
             break
 
     for p in features_batch_procs:
@@ -510,6 +524,14 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
         while not errornum_q.empty():
             errornum_sum += errornum_q.get()
         if not running:
+            break
+        # if all downstream CPU/write consumers died, unblock feature procs
+        consumers_alive = (any(p.is_alive() for p in call_mods_cpu_procs)
+                           and p_w.is_alive())
+        if not consumers_alive:
+            print("[WARNING] downstream consumer processes died, terminating feature procs")
+            for p in features_batch_procs:
+                p.terminate()
             break
 
     for p in features_batch_procs:
