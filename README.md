@@ -176,8 +176,7 @@ The compute tools (`deepsignal_plant`, `guppy_basecaller`, `dorado`, `tombo`, `s
 ### 2. Launch the GUI
 
 ```bash
-conda activate deepsignal-gui
-streamlit run gui/app.py
+conda run -n deepsignal-gui streamlit run gui/app.py
 ```
 
 The app opens at `http://localhost:8501` in your default browser. The sidebar lets you switch between the **R9.4.1 (FAST5 + Tombo)** and **R10.4.1 (POD5/BAM + Dorado)** protocols.

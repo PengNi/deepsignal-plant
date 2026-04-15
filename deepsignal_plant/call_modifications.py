@@ -54,6 +54,15 @@ else:
 # https://github.com/pytorch/pytorch/issues/37377
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
 
+# Limit intra-process threads to 1 to prevent thread explosion when running
+# many worker processes concurrently (each numpy/scipy call would otherwise
+# spawn its own OpenMP thread pool, exhausting system thread limits).
+# Use setdefault so users can override via environment if needed.
+os.environ.setdefault('OMP_NUM_THREADS', '1')
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
+os.environ.setdefault('MKL_NUM_THREADS', '1')
+os.environ.setdefault('NUMEXPR_NUM_THREADS', '1')
+
 queue_size_border_f5batch = 100
 queue_size_border = 1000
 time_wait = 1
@@ -352,7 +361,6 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
             time.sleep(time_wait)
         fast5s = fast5s_q.get()
         if fast5s == "kill":
-            fast5s_q.put("kill")
             break
         f5_num += len(fast5s)
         features_batches, error = _read_features_from_fast5s(fast5s, motif_seqs, chrom2len, positions, regioninfo,
@@ -360,14 +368,8 @@ def _read_features_fast5s_q(fast5s_q, features_batch_q, errornum_q,
         errornum_q.put(error)
         for features_batch in features_batches:
             features_batch_q.put(features_batch)
-        _backpressure_wait = 0
         while features_batch_q.qsize() > queue_size_border_f5batch:
             time.sleep(time_wait)
-            _backpressure_wait += time_wait
-            if _backpressure_wait > 300:
-                print("[WARNING] process-{} backpressure timeout (300s): "
-                      "downstream consumer may be dead, stopping".format(os.getpid()))
-                return
     print("read_fast5 process-{} ending, proceed {} fast5s".format(os.getpid(), f5_num))
 
 
@@ -403,10 +405,14 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
         print("--nproc must be >= --nproc_gpu + 2!!")
         nproc = nproc_gpu + 1 + 1
 
-    fast5s_q.put("kill")
+    nproc_extract = nproc - nproc_gpu - 1
+    # put one "kill" per worker so each worker gets its own kill signal
+    # without needing to forward it (avoids lost kill on thread exhaustion)
+    for _ in range(nproc_extract):
+        fast5s_q.put("kill")
     # queues of fast5s->features
     features_batch_procs = []
-    for _ in range(nproc - nproc_gpu - 1):
+    for _ in range(nproc_extract):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
                                                              motif_seqs, chrom2len, positions, regioninfo,
                                                              args))
@@ -439,11 +445,11 @@ def _call_mods_from_fast5s_gpu(motif_seqs, chrom2len, fast5s_q, len_fast5s, posi
             errornum_sum += errornum_q.get()
         if not running:
             break
-        # if all downstream GPU/write consumers died, unblock feature procs
-        consumers_alive = (any(p.is_alive() for p in call_mods_gpu_procs)
-                           and p_w.is_alive())
-        if not consumers_alive:
-            print("[WARNING] downstream consumer processes died, terminating feature procs")
+        # check if downstream consumers crashed (exitcode != 0 means abnormal exit)
+        crashed = any(p.exitcode not in (None, 0) for p in call_mods_gpu_procs) \
+                  or (not p_w.is_alive() and p_w.exitcode not in (None, 0))
+        if crashed:
+            print("[WARNING] downstream consumer process crashed, terminating feature procs")
             for p in features_batch_procs:
                 p.terminate()
             break
@@ -492,10 +498,12 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
     if nproc <= nproc_call_mods + 1:
         nproc = nproc_call_mods + 1 + 1
 
-    fast5s_q.put("kill")
+    nproc_extract = nproc - nproc_call_mods - 1
+    for _ in range(nproc_extract):
+        fast5s_q.put("kill")
     # queues of features->mods_call
     features_batch_procs = []
-    for _ in range(nproc - nproc_call_mods - 1):
+    for _ in range(nproc_extract):
         p = mp.Process(target=_read_features_fast5s_q, args=(fast5s_q, features_batch_q, errornum_q,
                                                              motif_seqs, chrom2len, positions, regioninfo,
                                                              args))
@@ -525,11 +533,11 @@ def _call_mods_from_fast5s_cpu2(motif_seqs, chrom2len, fast5s_q, len_fast5s, pos
             errornum_sum += errornum_q.get()
         if not running:
             break
-        # if all downstream CPU/write consumers died, unblock feature procs
-        consumers_alive = (any(p.is_alive() for p in call_mods_cpu_procs)
-                           and p_w.is_alive())
-        if not consumers_alive:
-            print("[WARNING] downstream consumer processes died, terminating feature procs")
+        # check if downstream consumers crashed (exitcode != 0 means abnormal exit)
+        crashed = any(p.exitcode not in (None, 0) for p in call_mods_cpu_procs) \
+                  or (not p_w.is_alive() and p_w.exitcode not in (None, 0))
+        if crashed:
+            print("[WARNING] downstream consumer process crashed, terminating feature procs")
             for p in features_batch_procs:
                 p.terminate()
             break
