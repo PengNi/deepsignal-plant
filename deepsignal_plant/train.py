@@ -109,15 +109,20 @@ def train(args):
         for i, sfeatures in enumerate(train_loader):
             _, kmer, base_means, base_stds, base_signal_lens, signals, labels = sfeatures
             if use_cuda:
-                kmer = kmer.cuda()
-                base_means = base_means.cuda()
-                base_stds = base_stds.cuda()
-                base_signal_lens = base_signal_lens.cuda()
-                signals = signals.cuda()
+                _start = kmer.shape[1] // 2 - args.seq_len // 2
+                kmer = kmer[:, _start:_start + args.seq_len].cuda()
+                base_means = base_means[:, _start:_start + args.seq_len].cuda()
+                base_stds = base_stds[:, _start:_start + args.seq_len].cuda()
+                base_signal_lens = base_signal_lens[:, _start:_start + args.seq_len].cuda()
+                signals = signals[:, _start:_start + args.seq_len].cuda()
                 labels = labels.cuda()
+                x_mask = torch.isnan(signals)
+                signals[x_mask] = 0
 
             # Forward pass
             outputs, logits = model(kmer, base_means, base_stds, base_signal_lens, signals)
+            outputs = torch.nan_to_num(outputs, nan=0.0, posinf=10.0, neginf=-10.0)
+            labels = labels.long()
             loss = criterion(outputs, labels)
             tlosses.append(loss.detach().item())
 
@@ -134,13 +139,17 @@ def train(args):
                     for vi, vsfeatures in enumerate(valid_loader):
                         _, vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals, vlabels = vsfeatures
                         if use_cuda:
-                            vkmer = vkmer.cuda()
-                            vbase_means = vbase_means.cuda()
-                            vbase_stds = vbase_stds.cuda()
-                            vbase_signal_lens = vbase_signal_lens.cuda()
-                            vsignals = vsignals.cuda()
+                            vkmer = vkmer[:, _start:_start + args.seq_len].cuda()
+                            vbase_means = vbase_means[:, _start:_start + args.seq_len].cuda()
+                            vbase_stds = vbase_stds[:, _start:_start + args.seq_len].cuda()
+                            vbase_signal_lens = vbase_signal_lens[:, _start:_start + args.seq_len].cuda()
+                            vsignals = vsignals[:, _start:_start + args.seq_len].cuda()
                             vlabels = vlabels.cuda()
+                            vx_mask = torch.isnan(vsignals)
+                            vsignals[vx_mask] = 0
                         voutputs, vlogits = model(vkmer, vbase_means, vbase_stds, vbase_signal_lens, vsignals)
+                        voutputs = torch.nan_to_num(voutputs, nan=0.0, posinf=10.0, neginf=-10.0)
+                        vlabels = vlabels.long()
                         vloss = criterion(voutputs, vlabels)
 
                         _, vpredicted = torch.max(vlogits.data, 1)

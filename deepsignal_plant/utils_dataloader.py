@@ -14,7 +14,6 @@ from .extract_features import _get_signals_rect
 from .extract_features import _normalize_signals
 from .extract_features_pod5 import _group_signals_by_movetable_v2
 from .extract_features_pod5 import get_q2tloc_from_cigar
-import math
 import queue
 import time
 LOGGER = get_logger(__name__)
@@ -33,47 +32,27 @@ def pod5_producer(files_dr, data_queue, num_consumers, format_type):
         import pyslow5 as _pyslow5
 
     for file in files_dr:
+        # Each file is processed independently; a broken file is skipped so
+        # that the sentinel Nones are always emitted at the end.
         try:
             if format_type == 'pod5':
                 with _pod5.Reader(file) as reader:
-                    #LOGGER.debug("pod5 file: {}".format(file))
                     for read_record in reader.reads():
-                        #LOGGER.debug("read_record")
                         read_name = str(read_record.read_id)
-                        
-                        data_queue.put((read_name,read_record.signal.copy()))
-                        #LOGGER.debug("read_name: {}".format(read_name))
-                        #LOGGER.debug("data_queue.put")
-                        # try:
-                        #     # # 提前匹配 BAM，减少 Dataset 负担
-                        #     # for seq_read in bam_index.get_alignments(read_name):
-                        #     #     # 只把必要的原始数据塞进队列 (signal + alignment object)
-                        #     #     data_queue.put((read_record.signal, seq_read))
-                        # except KeyError:
-                        #     continue
+                        data_queue.put((read_name, read_record.signal.copy()))
             elif format_type == 'slow5':
                 with _pyslow5.Open(file, 'r') as reader:
                     for read_record in reader.seq_reads():
                         read_name = str(read_record['read_id'])
-                        data_queue.put((read_name,read_record['signal'].copy()))
-                        # 
-                        # try:
-                        #     # 提前匹配 BAM，减少 Dataset 负担
-                        #     for seq_read in bam_index.get_alignments(read_name):
-                        #         # 只把必要的原始数据塞进队列 (signal + alignment object)
-                        #         data_queue.put((read_record.signal, seq_read))
-                        # except KeyError:
-                        #     continue
-        except queue.Full:
-            #LOGGER.warning("Queue full, waiting...")
-            time.sleep(0.1)
+                        data_queue.put((read_name, read_record['signal'].copy()))
         except Exception as e:
-            #LOGGER.error(f"Failed to put data: {e}")
-            return
-    # 重点：放 num_consumers 个 None 信号
+            # Skip corrupted/unreadable file and continue with remaining files.
+            # Do NOT return here — sentinels must be emitted unconditionally.
+            print("[Producer] WARNING: skipping file {} due to: {}".format(file, e), flush=True)
+            continue
+    # Always emit one sentinel per consumer so every worker exits cleanly.
     for _ in range(num_consumers):
         data_queue.put(None)
-    #stop_event.set()
     print("[Producer] All files parsed and matched.", flush=True)
 class SignalDataset(IterableDataset):
     def __init__(self, data_queue,bam_index,motif_seqs,positions, args, device):

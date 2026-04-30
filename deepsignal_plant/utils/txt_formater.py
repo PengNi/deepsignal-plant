@@ -12,7 +12,7 @@ class ModRecord:
         self._site_key = key_sep.join([self._chromosome, str(self._pos)])
 
         self._strand = fields[2]
-        self._pos_in_strand = int(fields[3])
+        self._pos_in_strand = '.' if fields[3] == '.' else int(fields[3])
         self._readname = fields[4]
         self._read_strand = fields[5]
         self._prob_0 = float(fields[6])

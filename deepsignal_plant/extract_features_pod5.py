@@ -85,7 +85,7 @@ def _group_signals_by_movetable_v2(trimed_signals, movetable, stride):
     move_pos = np.append(np.argwhere(movetable == 1).flatten(), len(movetable))
     for move_idx in range(len(move_pos) - 1):
         start, end = move_pos[move_idx], move_pos[move_idx + 1]
-        signal_group.append(trimed_signals[(start * stride) : (end * stride)].tolist())
+        signal_group.append(trimed_signals[(start * stride) : (end * stride)])
     assert len(signal_group) == np.sum(movetable)
     return signal_group
 

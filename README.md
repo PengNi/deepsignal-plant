@@ -236,7 +236,7 @@ Then open `http://localhost:8501` in your browser.
 > **Tip — custom port:** If port 8501 is already in use on the server, launch Streamlit on a different port and adjust the tunnel accordingly:
 > ```bash
 > # on the server
-> streamlit run gui/app.py --server.port 8502
+> conda run -n deepsignal-gui streamlit run gui/app.py --server.port 8502
 > # tunnel (local)
 > ssh -L 8502:localhost:8502 <username>@<hpc-server>
 > # browser

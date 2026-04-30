@@ -32,13 +32,14 @@ from .utils.process_utils import get_files,get_motif_seqs,read_position_file,det
 from .extract_features import _extract_features
 from .extract_features import _extract_preprocess_
 from .extract_features import _extract_preprocess_fast5sinfo
+from .extract_features import _normalize_signals, _get_signals_rect
+from .extract_features_pod5 import _group_signals_by_movetable_v2, get_q2tloc_from_cigar
+from .utils.process_utils import get_refloc_of_methysite_in_motif, key_sep
 
 from .utils.constants_torch import FloatTensor
 from .utils.constants_torch import use_cuda
 
-from torch.utils.data import DataLoader
-from .utils_dataloader import SignalDataset, pod5_producer
-from .utils_dataloader import collate_fn_inference, worker_init_fn
+from .utils_dataloader import pod5_producer
 
 import uuid
 
@@ -679,73 +680,167 @@ def determine_process_count(world_size,args):
     if use_cuda:
         return max(1, args.nproc//world_size)
     return max(1, args.nproc//world_size)
-def _call_mods_pod5(rank, args, pred_str_q, data_queue, motif_seqs, positions):
-    # CUDA 绑定
-    use_cuda = torch.cuda.is_available()
-    if use_cuda:
-        torch.cuda.set_device(rank)
-
-    # ⚠️ 每个进程自己打开 BAM（不能跨进程传）
-    bam_index = bam_reader.ReadIndexedBam(args.bam)
-
-    dataset = SignalDataset(
-        data_queue=data_queue,
-        bam_index=bam_index,
-        motif_seqs=motif_seqs,
-        positions=positions,
-        args=args,
-        device=rank if use_cuda else "cpu"
-    )
-
-    data_loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        num_workers=0,
-        collate_fn=collate_fn_inference,
-        pin_memory=True,   # num_workers=0 时没意义
-    )
-
-    model = ModelBiLSTM(
-        args.seq_len, args.signal_len,
-        args.layernum1, args.layernum2,
-        args.class_num, args.dropout_rate,
-        args.hid_rnn, args.n_vocab,
-        args.n_embed,
-        str2bool(args.is_base),
-        str2bool(args.is_signallen),
-        module=args.model_type,
-        device=rank
-    )
-
-    para_dict = torch.load(args.model_path, map_location="cpu")
-    model.load_state_dict({**model.state_dict(), **para_dict})
-
-    if use_cuda:
-        model.cuda(rank)
-
-    model.eval()
-    print(f"[GPU-{rank}] pid={os.getpid()} started", flush=True)
-    accuracy_list = []
-    batch_num_total = 0
-    with torch.no_grad():
-        for batch in data_loader:
-            if batch is None:
+def _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, args):
+    """
+    Extract features from one pod5/slow5 read.
+    Returns a list of (sampleinfo, k_seq, signal_means, signal_stds, signal_lens, k_signals_rect, label)
+    tuples as plain Python lists — compatible with _call_mods / FloatTensor.
+    """
+    features_list = []
+    try:
+        for seq_read in bam_index.get_alignments(read_name):
+            seq = seq_read.get_forward_sequence()
+            if seq is None:
                 continue
 
-            pred_str, accuracy, batch_num = _call_mods(
-                batch, model, args.batch_size, rank
+            read_dict = dict(seq_read.tags)
+            if "mv" not in read_dict:
+                continue
+
+            mv_table = np.asarray(read_dict["mv"][1:])
+            stride = int(read_dict["mv"][0])
+            num_trimmed = read_dict["ts"]
+            if seq_read.has_tag('sp'):
+                num_trimmed += seq_read.get_tag('sp')
+
+            signal_trimmed = signal[num_trimmed:] if num_trimmed >= 0 else signal[:num_trimmed]
+            norm_signals = _normalize_signals(signal_trimmed, args.normalize_method)
+            signal_group = _group_signals_by_movetable_v2(norm_signals, mv_table, stride)
+
+            tsite_locs = get_refloc_of_methysite_in_motif(seq, set(motif_seqs), args.mod_loc)
+
+            strand = "."
+            q_to_r_poss = None
+            ref_start = ref_end = 0
+            seq_start = seq_end = 0
+            if not seq_read.is_unmapped:
+                strand = "-" if seq_read.is_reverse else "+"
+                strand_code = -1 if seq_read.is_reverse else 1
+                ref_start = seq_read.reference_start
+                ref_end = seq_read.reference_end
+                cigar_tuples = seq_read.cigartuples
+                qalign_start = seq_read.query_alignment_start
+                qalign_end = seq_read.query_alignment_end
+                if seq_read.is_reverse:
+                    seq_start = len(seq) - qalign_end
+                    seq_end = len(seq) - qalign_start
+                else:
+                    seq_start = qalign_start
+                    seq_end = qalign_end
+                q_to_r_poss = get_q2tloc_from_cigar(
+                    cigar_tuples, strand_code, (seq_end - seq_start)
+                )
+
+            ref_name = seq_read.reference_name if seq_read.reference_name is not None else "."
+
+            num_bases = (args.seq_len - 1) // 2
+            for loc_in_read in tsite_locs:
+                if not (num_bases <= loc_in_read < len(seq) - num_bases):
+                    continue
+
+                ref_pos = -1
+                if not seq_read.is_unmapped:
+                    if seq_start <= loc_in_read < seq_end:
+                        offset_idx = loc_in_read - seq_start
+                        if q_to_r_poss[offset_idx] != -1:
+                            if strand == "-":
+                                ref_pos = ref_end - 1 - q_to_r_poss[offset_idx]
+                            else:
+                                ref_pos = ref_start + q_to_r_poss[offset_idx]
+                    else:
+                        continue
+
+                if positions is not None and (
+                    key_sep.join([ref_name, str(ref_pos), strand]) not in positions
+                ):
+                    continue
+
+                k_mer = seq[(loc_in_read - num_bases):(loc_in_read + num_bases + 1)]
+                k_seq = [base2code_dna[x] for x in k_mer]
+                k_signals = signal_group[(loc_in_read - num_bases):(loc_in_read + num_bases + 1)]
+
+                sampleinfo = "\t".join([
+                    ref_name,
+                    str(ref_pos),
+                    strand,
+                    ".",
+                    seq_read.query_name,
+                    ".",
+                ])
+
+                features_list.append((
+                    sampleinfo,
+                    k_seq,
+                    [float(np.mean(x)) for x in k_signals],
+                    [float(np.std(x)) for x in k_signals],
+                    [len(x) for x in k_signals],
+                    _get_signals_rect(k_signals, args.signal_len),
+                    args.methy_label,
+                ))
+    except KeyError:
+        pass
+    except Exception:
+        pass
+    return features_list
+
+
+def _read_features_pod5_q(signal_q, features_batch_q, errornum_q,
+                           bam_path, motif_seqs, positions, args):
+    """
+    CPU worker: drain signal_q, extract pod5/slow5 features, push batches to features_batch_q.
+    Mirrors _read_features_fast5s_q for the pod5 pipeline.
+    """
+    print("read_pod5_features process-{} starts".format(os.getpid()))
+    bam_index = bam_reader.ReadIndexedBam(bam_path)
+
+    batch_size = args.f5_batch_size
+    sampleinfo, kmers, base_means, base_stds, base_signal_lens, k_signals, labels = \
+        [], [], [], [], [], [], []
+
+    def _flush():
+        if sampleinfo:
+            features_batch_q.put(
+                (list(sampleinfo), list(kmers), list(base_means),
+                 list(base_stds), list(base_signal_lens), list(k_signals), list(labels))
             )
-            pred_str_q.put(pred_str)
-            while pred_str_q.qsize() > queue_size_border:
-                time.sleep(time_wait)
-            accuracy_list.append(accuracy)
-            batch_num_total += batch_num
-    print('call_mods process-{} ending, proceed {} feature-batches({})'.format(os.getpid(), batch_num_total,
-                                                                               args.batch_size))
-    print(f"[GPU-{rank}] finished", flush=True)
-    
+            sampleinfo.clear(); kmers.clear(); base_means.clear()
+            base_stds.clear(); base_signal_lens.clear()
+            k_signals.clear(); labels.clear()
+
+    read_num = 0
+    for item in iter(signal_q.get, None):
+        read_name, signal = item
+        feats = _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, args)
+        for (si, kseq, smeans, sstds, slens, ksig, lbl) in feats:
+            sampleinfo.append(si)
+            kmers.append(kseq)
+            base_means.append(smeans)
+            base_stds.append(sstds)
+            base_signal_lens.append(slens)
+            k_signals.append(ksig)
+            labels.append(lbl)
+            if len(sampleinfo) >= batch_size:
+                _flush()
+                while features_batch_q.qsize() > queue_size_border_f5batch:
+                    time.sleep(time_wait)
+        read_num += 1
+
+    _flush()  # emit the last partial batch
+    print("read_pod5_features process-{} ending, processed {} reads".format(os.getpid(), read_num))
+
 
 def call_mods_pod5(args):
+    """
+    Multi-process pod5/slow5 inference pipeline.
+
+    Architecture (mirrors the fast5 GPU pipeline):
+      producer (1)  →  signal_q  →  CPU feature workers (nproc - nproc_gpu - 1)
+                    →  features_batch_q  →  GPU workers (nproc_gpu, reuse _call_mods_q)
+                    →  pred_str_q  →  writer (1)
+
+    This separates CPU-bound feature extraction from GPU inference so the GPU
+    is never stalled waiting for BAM lookups / signal normalization.
+    """
     start = time.time()
     mp.set_start_method("spawn", force=True)
     mp.set_sharing_strategy("file_system")
@@ -758,44 +853,100 @@ def call_mods_pod5(args):
     file_type = detect_file_type(args.input_path, is_recursive)
     files_dr = get_files(args.input_path, is_recursive, file_type)
 
-    # writer
-    pred_str_q = mp.Queue()
+    nproc = args.nproc
+    nproc_gpu = args.nproc_gpu
+    if nproc_gpu < 1:
+        nproc_gpu = 1
+    if nproc <= nproc_gpu + 1:
+        print("--nproc must be >= --nproc_gpu + 2, adjusting..")
+        nproc = nproc_gpu + 2
+    nproc_extract = nproc - nproc_gpu - 1
+
+    # ---- queues ----
+    signal_q = Queue(maxsize=500)          # (read_name, signal) from producer
+    features_batch_q = Queue()             # batched feature tuples
+    errornum_q = Queue()
+    pred_str_q = Queue()
+
+    # ---- writer ----
     p_writer = mp.Process(
         target=_write_predstr_to_file,
         args=(args.result_file, pred_str_q, args.gzip),
-        name="writer"
+        name="writer",
     )
+    p_writer.daemon = True
     p_writer.start()
 
-    # GPU workers
-    num_gpu = torch.cuda.device_count()
-    data_queues = mp.Queue(maxsize=10)
-    gpu_procs = []
-
-    for rank in range(num_gpu):
+    # ---- GPU / inference workers (reuse _call_mods_q) ----
+    gpulist = _get_gpus()
+    gpuindex = 0
+    call_mods_gpu_procs = []
+    for _ in range(nproc_gpu):
         p = mp.Process(
-            target=_call_mods_pod5,
-            args=(rank, args, pred_str_q, data_queues, motif_seqs, positions),
-            name=f"gpu-{rank}"
+            target=_call_mods_q,
+            args=(args.model_path, features_batch_q, pred_str_q,
+                  None, args, gpulist[gpuindex]),
+            name="gpu-{}".format(gpulist[gpuindex]),
         )
+        gpuindex += 1
+        p.daemon = True
         p.start()
-        gpu_procs.append(p)
+        call_mods_gpu_procs.append(p)
 
-    # producer
+    # ---- CPU feature-extraction workers ----
+    # pod5_producer puts nproc_extract sentinel Nones at the end, one per worker,
+    # so workers stop cleanly without any forwarding.
+    features_batch_procs = []
+    for _ in range(nproc_extract):
+        p = mp.Process(
+            target=_read_features_pod5_q,
+            args=(signal_q, features_batch_q, errornum_q,
+                  args.bam, motif_seqs, positions, args),
+            name="feat-extract",
+        )
+        p.daemon = True
+        p.start()
+        features_batch_procs.append(p)
+
+    # ---- producer (started after workers so signal_q is being consumed) ----
     p_producer = mp.Process(
         target=pod5_producer,
-        args=(files_dr, data_queues,num_gpu, file_type),
-        name="producer"
+        args=(files_dr, signal_q, nproc_extract, file_type),
+        name="producer",
     )
     p_producer.start()
 
-    # join
-    p_producer.join()
-    for p in gpu_procs:
+    # ---- wait for feature workers, with crash detection ----
+    while True:
+        running = any(p.is_alive() for p in features_batch_procs)
+        if not running:
+            break
+        crashed = (
+            any(p.exitcode not in (None, 0) for p in call_mods_gpu_procs)
+            or (not p_writer.is_alive() and p_writer.exitcode not in (None, 0))
+            or (not p_producer.is_alive() and p_producer.exitcode not in (None, 0))
+        )
+        if crashed:
+            print("[WARNING] upstream/downstream process crashed, terminating feature workers")
+            for p in features_batch_procs:
+                p.terminate()
+            break
+        time.sleep(time_wait)
+
+    for p in features_batch_procs:
+        p.join()
+
+    # signal GPU workers to stop
+    features_batch_q.put("kill")
+
+    for p in call_mods_gpu_procs:
         p.join()
 
     pred_str_q.put("kill")
     p_writer.join()
+
+    p_producer.join()
+
     print("[main] call_mods costs %.2f seconds.." % (time.time() - start))
     print("[Main] all done", flush=True)
 
