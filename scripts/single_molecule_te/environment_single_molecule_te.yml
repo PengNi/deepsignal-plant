@@ -1,0 +1,8 @@
+name: deepsignal-plant-te
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9,<3.12
+  - numpy>=1.21,<2.0
+  - pandas>=1.4,<2.2
+  - matplotlib>=3.5,<3.9

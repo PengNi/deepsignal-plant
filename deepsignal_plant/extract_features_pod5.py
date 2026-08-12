@@ -17,6 +17,19 @@ import time
 import numpy as np
 import multiprocessing as mp
 
+# ── Numba JIT shim ────────────────────────────────────────────────────────────
+# If numba is available, inner loops are JIT-compiled to native code (big speedup
+# for CIGAR parsing and signal rect building). Falls back to pure Python silently.
+try:
+    from numba import jit as _numba_jit
+    _NUMBA_AVAILABLE = True
+except ImportError:
+    _NUMBA_AVAILABLE = False
+    def _numba_jit(*args, **kwargs):
+        def _decorator(fn): return fn
+        return _decorator
+# ─────────────────────────────────────────────────────────────────────────────
+
 # TODO: when using below import, will raise AttributeError: 'Queue' object has no attribute '_size'
 # TODO: in call_mods module, didn't figure out why
 # from .utils.process_utils import Queue
@@ -89,47 +102,89 @@ def _group_signals_by_movetable_v2(trimed_signals, movetable, stride):
     assert len(signal_group) == np.sum(movetable)
     return signal_group
 
-def get_q2tloc_from_cigar(r_cigar_tuple, strand, seq_len):
-    """
-    insertion: -1, deletion: -2, mismatch: -3
-    :param r_cigar_tuple: pysam.alignmentSegment.cigartuples
-    :param strand: 1/-1 for fwd/rev
-    :param seq_len: read alignment length
-    :return: query pos to ref pos
-    """
-    fill_invalid = -2
-    # get each base calls genomic position
-    q_to_r_poss = np.full(seq_len + 1, fill_invalid, dtype=np.int32)
-    # process cigar ops in read direction
-    curr_r_pos, curr_q_pos = 0, 0
-    cigar_ops = r_cigar_tuple if strand == 1 else r_cigar_tuple[::-1]
-    for op, op_len in cigar_ops:
-        if op == 1:
-            # inserted bases into ref
+@_numba_jit(nopython=True, cache=True)
+def _q2tloc_jit(cigar_ops, cigar_lens, seq_len, forward):
+    """JIT kernel: map query positions to reference positions via CIGAR."""
+    q_to_r_poss = np.full(seq_len + 1, np.int32(-2), dtype=np.int32)
+    curr_r_pos = np.int32(0)
+    curr_q_pos = np.int32(0)
+    n = len(cigar_ops)
+    for ii in range(n):
+        i = ii if forward else (n - 1 - ii)
+        op = cigar_ops[i]
+        op_len = cigar_lens[i]
+        if op == 1:                          # insertion
             for q_pos in range(curr_q_pos, curr_q_pos + op_len):
-                q_to_r_poss[q_pos] = -1
+                q_to_r_poss[q_pos] = np.int32(-1)
             curr_q_pos += op_len
-        elif op in (2, 3):
-            # deleted ref bases
+        elif op == 2 or op == 3:             # deletion / skip
             curr_r_pos += op_len
-        elif op in (0, 7, 8):
-            # aligned bases
-            for op_offset in range(op_len):
-                q_to_r_poss[curr_q_pos + op_offset] = curr_r_pos + op_offset
+        elif op == 0 or op == 7 or op == 8:  # match / seq-match / mismatch
+            for off in range(op_len):
+                q_to_r_poss[curr_q_pos + off] = curr_r_pos + off
             curr_q_pos += op_len
             curr_r_pos += op_len
-        elif op == 6:
-            # padding (shouldn't happen in mappy)
-            pass
     q_to_r_poss[curr_q_pos] = curr_r_pos
-    if q_to_r_poss[-1] == fill_invalid:
+    return q_to_r_poss
+
+
+def get_q2tloc_from_cigar(r_cigar_tuple, strand, seq_len):
+    """Map query positions to reference positions via CIGAR (JIT-accelerated)."""
+    ops  = np.array([op for op, _  in r_cigar_tuple], dtype=np.int32)
+    lens = np.array([ln for _,  ln in r_cigar_tuple], dtype=np.int32)
+    q_to_r_poss = _q2tloc_jit(ops, lens, seq_len, strand == 1)
+    if q_to_r_poss[-1] == -2:
         raise ValueError(
-            (
-                "Invalid cigar string encountered. Reference length: {}  Cigar "
-                + "implied reference length: {}"
-            ).format(seq_len, curr_r_pos)
+            "Invalid cigar string encountered. Reference length: {}  Cigar "
+            "implied reference length: {}".format(seq_len, int(q_to_r_poss[seq_len]))
         )
     return q_to_r_poss
+
+
+@_numba_jit(nopython=True, cache=True)
+def _build_signal_rect_jit(sig, starts, ends, signals_len):
+    """JIT kernel: build fixed-size signal matrix from variable-length per-base signals."""
+    N = len(starts)
+    out   = np.zeros((N, signals_len), dtype=np.float32)
+    valid = np.ones((N, signals_len),  dtype=np.bool_)
+    for i in range(N):
+        s = starts[i]
+        e = ends[i]
+        L = e - s
+        if L == 0:
+            for j in range(signals_len):
+                valid[i, j] = False
+            continue
+        if L <= signals_len:
+            pad_left = (signals_len - L) // 2
+            for j in range(pad_left):
+                valid[i, j] = False
+            for j in range(L):
+                out[i, pad_left + j] = sig[s + j]
+            for j in range(pad_left + L, signals_len):
+                valid[i, j] = False
+        else:
+            for j in range(signals_len):
+                idx = s + int(j * (L - 1) / (signals_len - 1))
+                out[i, j] = sig[idx]
+    return out, valid
+
+
+def build_signal_rect_from_movetable(trimed_signals, movetable, stride, signals_len=16):
+    """
+    Build (num_bases, signals_len) fixed-size signal matrix from a move table in one pass.
+    Replaces the two-pass _group_signals_by_movetable_v2 + _get_signals_rect pattern:
+    call this once per read, then slice [loc-k : loc+k+1] per site.
+    """
+    move_idx = np.flatnonzero(movetable == 1)
+    move_idx = np.append(move_idx, len(movetable))
+    starts = (move_idx[:-1] * stride).astype(np.int64)
+    ends   = (move_idx[1:]  * stride).astype(np.int64)
+    sig = np.ascontiguousarray(trimed_signals, dtype=np.float32)
+    out, _ = _build_signal_rect_jit(sig, starts, ends, signals_len)
+    # Padding positions are already 0 (out is zero-initialized); matches the
+    # original _get_signals_rect zero-pad behavior expected by the trained model.
+    return out
 
 
 ################utils###################

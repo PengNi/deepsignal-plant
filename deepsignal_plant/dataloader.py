@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset
-import linecache
 import os
 import numpy as np
 
@@ -7,16 +6,10 @@ from .utils.process_utils import base2code_dna
 
 
 def clear_linecache():
-    # linecache should be treated carefully
-    linecache.clearcache()
+    pass
 
 
 def parse_a_line2(line):
-    """
-    parse features of a sample
-    :param line:
-    :return:
-    """
     words = line.strip().split("\t")
 
     sampleinfo = "\t".join(words[0:6])
@@ -33,24 +26,39 @@ def parse_a_line2(line):
 
 class SignalFeaData2(Dataset):
     def __init__(self, filename, transform=None):
-        # print(">>>using linecache to access '{}'<<<\n"
-        #       ">>>after done using the file, "
-        #       "remember to use linecache.clearcache() to clear cache for safety<<<".format(filename))
         self._filename = os.path.abspath(filename)
-        self._total_data = 0
         self._transform = transform
-        with open(filename, "r") as f:
-            self._total_data = len(f.readlines())
+        self._file = None
+        # Build a byte-offset index so __getitem__ can seek directly to any line
+        # without loading the entire file into memory (linecache would cache ~10-20 GB
+        # for a 20M-line file, causing OOM / SIGTERM on cluster nodes).
+        offsets = []
+        with open(self._filename, "rb") as f:
+            pos = 0
+            for line in f:
+                offsets.append(pos)
+                pos += len(line)
+        self._offsets = np.array(offsets, dtype=np.int64)
+        self._total_data = len(self._offsets)
 
     def __getitem__(self, idx):
-        line = linecache.getline(self._filename, idx + 1)
+        if self._file is None:
+            self._file = open(self._filename, "r", encoding="utf-8")
+        self._file.seek(int(self._offsets[idx]))
+        line = self._file.readline()
         if line == "":
             return None
-        else:
-            output = parse_a_line2(line)
-            if self._transform is not None:
-                output = self._transform(output)
-            return output
+        output = parse_a_line2(line)
+        if self._transform is not None:
+            output = self._transform(output)
+        return output
 
     def __len__(self):
         return self._total_data
+
+    def __del__(self):
+        if self._file is not None:
+            try:
+                self._file.close()
+            except Exception:
+                pass

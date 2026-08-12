@@ -7,6 +7,7 @@ prob_0, prob_1, called_label, seq
 
 from __future__ import absolute_import
 
+import contextlib
 import torch
 import argparse
 import os
@@ -21,6 +22,25 @@ import torch.multiprocessing as mp
 
 import time
 
+# ── PyTorch version-compatibility shims ──────────────────────────────────────
+# torch.inference_mode: added in 1.9; fall back to no_grad on older builds.
+_inference_mode = getattr(torch, 'inference_mode', torch.no_grad)
+
+
+def _autocast_ctx(enabled, amp_dtype):
+    """Return the best available autocast context manager."""
+    if not enabled:
+        return contextlib.nullcontext()
+    if hasattr(torch, 'amp'):                          # PyTorch >= 1.10
+        return torch.amp.autocast(device_type='cuda', dtype=amp_dtype)
+    if hasattr(torch.cuda, 'amp'):                    # PyTorch >= 1.6
+        try:
+            return torch.cuda.amp.autocast(dtype=amp_dtype)
+        except TypeError:
+            return torch.cuda.amp.autocast()
+    return contextlib.nullcontext()
+# ─────────────────────────────────────────────────────────────────────────────
+
 from .models import ModelBiLSTM
 from .utils.process_utils import base2code_dna
 from .utils.process_utils import code2base_dna
@@ -32,14 +52,15 @@ from .utils.process_utils import get_files,get_motif_seqs,read_position_file,det
 from .extract_features import _extract_features
 from .extract_features import _extract_preprocess_
 from .extract_features import _extract_preprocess_fast5sinfo
-from .extract_features import _normalize_signals, _get_signals_rect
-from .extract_features_pod5 import _group_signals_by_movetable_v2, get_q2tloc_from_cigar
+from .extract_features import _normalize_signals
+from .extract_features_pod5 import (
+    _group_signals_by_movetable_v2, get_q2tloc_from_cigar,
+    build_signal_rect_from_movetable,
+)
 from .utils.process_utils import get_refloc_of_methysite_in_motif, key_sep
 
 from .utils.constants_torch import FloatTensor
 from .utils.constants_torch import use_cuda
-
-from .utils_dataloader import pod5_producer
 
 import uuid
 
@@ -161,6 +182,7 @@ def _call_mods(features_batch, model, batch_size, device=0):
     pred_str = []
     accuracys = []
     batch_num = 0
+    _amp_dtype = torch.float16  # bf16 LSTM CUDA kernels require newer PyTorch; float16 is safe
     for i in np.arange(0, len(sampleinfo), batch_size):
         batch_s, batch_e = i, i + batch_size
         b_sampleinfo = sampleinfo[batch_s:batch_e]
@@ -173,10 +195,12 @@ def _call_mods(features_batch, model, batch_size, device=0):
 
         # call mods of each batch
         if len(b_sampleinfo) > 0:
-            voutputs, vlogits = model(FloatTensor(b_kmers, device), FloatTensor(b_base_means, device),
-                                      FloatTensor(b_base_stds, device),
-                                      FloatTensor(b_base_signal_lens, device),
-                                      FloatTensor(b_k_signals, device))
+            with _inference_mode(), _autocast_ctx(use_cuda, _amp_dtype):
+                voutputs, vlogits = model(FloatTensor(b_kmers, device), FloatTensor(b_base_means, device),
+                                          FloatTensor(b_base_stds, device),
+                                          FloatTensor(b_base_signal_lens, device),
+                                          FloatTensor(b_k_signals, device))
+            vlogits = vlogits.float()  # cast back to float32 for stable probability arithmetic
             _, vpredicted = torch.max(vlogits.data, 1)
             if use_cuda:
                 vlogits = vlogits.cpu()
@@ -243,6 +267,15 @@ def _call_mods_q(model_path, features_batch_q, pred_str_q, success_file, args, d
     if use_cuda:
         model = model.cuda(device)
     model.eval()
+
+    if use_cuda:
+        torch.backends.cudnn.benchmark = True
+        try:
+            torch.set_float32_matmul_precision("high")  # TF32 on Ampere+
+        except AttributeError:
+            pass
+    else:
+        torch.set_num_threads(1)
 
     accuracy_list = []
     batch_num_total = 0
@@ -683,8 +716,13 @@ def determine_process_count(world_size,args):
 def _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, args):
     """
     Extract features from one pod5/slow5 read.
-    Returns a list of (sampleinfo, k_seq, signal_means, signal_stds, signal_lens, k_signals_rect, label)
-    tuples as plain Python lists — compatible with _call_mods / FloatTensor.
+    Returns a list of (sampleinfo, k_seq, signal_means, signal_stds, signal_lens, k_signals_rect, label).
+
+    Key optimisation vs the old version:
+      - build_signal_rect_from_movetable() is called ONCE per read (JIT-compiled single pass)
+        and the result is sliced per site — the old code called _get_signals_rect() per site.
+      - _group_signals_by_movetable_v2() is still called once for mean/std/len computation.
+      - k_seq built with np.fromiter (avoids per-char dict lookup in a Python list).
     """
     features_list = []
     try:
@@ -705,7 +743,13 @@ def _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, 
 
             signal_trimmed = signal[num_trimmed:] if num_trimmed >= 0 else signal[:num_trimmed]
             norm_signals = _normalize_signals(signal_trimmed, args.normalize_method)
+
+            # build once per read: variable-length groups for mean/std/len
             signal_group = _group_signals_by_movetable_v2(norm_signals, mv_table, stride)
+            # build once per read: fixed-size (num_bases, signal_len) matrix via JIT
+            signal_rect = build_signal_rect_from_movetable(
+                norm_signals, mv_table, stride, args.signal_len
+            )
 
             tsite_locs = get_refloc_of_methysite_in_motif(seq, set(motif_seqs), args.mod_loc)
 
@@ -755,26 +799,28 @@ def _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, 
                 ):
                     continue
 
-                k_mer = seq[(loc_in_read - num_bases):(loc_in_read + num_bases + 1)]
-                k_seq = [base2code_dna[x] for x in k_mer]
-                k_signals = signal_group[(loc_in_read - num_bases):(loc_in_read + num_bases + 1)]
+                s = loc_in_read - num_bases
+                e = loc_in_read + num_bases + 1
+                k_mer = seq[s:e]
+                k_seq = np.fromiter(
+                    (base2code_dna[x] for x in k_mer),
+                    dtype=np.int64, count=args.seq_len,
+                )
+                k_signals_v = signal_group[s:e]
+                # slice pre-built rect — O(1) instead of per-site Python loop
+                k_signals_rect = signal_rect[s:e]
 
                 sampleinfo = "\t".join([
-                    ref_name,
-                    str(ref_pos),
-                    strand,
-                    ".",
-                    seq_read.query_name,
-                    ".",
+                    ref_name, str(ref_pos), strand, ".", seq_read.query_name, ".",
                 ])
 
                 features_list.append((
                     sampleinfo,
                     k_seq,
-                    [float(np.mean(x)) for x in k_signals],
-                    [float(np.std(x)) for x in k_signals],
-                    [len(x) for x in k_signals],
-                    _get_signals_rect(k_signals, args.signal_len),
+                    np.array([np.mean(x) for x in k_signals_v], dtype=np.float32),
+                    np.array([np.std(x)  for x in k_signals_v], dtype=np.float32),
+                    np.array([len(x)     for x in k_signals_v], dtype=np.float32),
+                    k_signals_rect,
                     args.methy_label,
                 ))
     except KeyError:
@@ -784,15 +830,23 @@ def _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, 
     return features_list
 
 
-def _read_features_pod5_q(signal_q, features_batch_q, errornum_q,
-                           bam_path, motif_seqs, positions, args):
+def _pod5_io_worker(worker_id, files, features_batch_q,
+                    bam_path, motif_seqs, positions, file_type, nproc_io, args):
     """
-    CPU worker: drain signal_q, extract pod5/slow5 features, push batches to features_batch_q.
-    Mirrors _read_features_fast5s_q for the pod5 pipeline.
-    """
-    print("read_pod5_features process-{} starts".format(os.getpid()))
-    bam_index = bam_reader.ReadIndexedBam(bam_path)
+    Merged IO+feature-extraction worker (replaces separate pod5_producer + _read_features_pod5_q).
 
+    Each worker owns a disjoint file shard (files[worker_id::nproc_io]), so there is no
+    shared signal_q bottleneck.  Reads are processed inline: signal → features → batch put.
+    """
+    print("pod5_io_worker-{} (pid {}) starts, {} files".format(
+        worker_id, os.getpid(), len(files[worker_id::nproc_io])))
+
+    if file_type == 'pod5':
+        import pod5 as _pod5
+    elif file_type in ('slow5', 'blow5'):
+        import pyslow5 as _pyslow5
+
+    bam_index = bam_reader.ReadIndexedBam(bam_path)
     batch_size = args.f5_batch_size
     sampleinfo, kmers, base_means, base_stds, base_signal_lens, k_signals, labels = \
         [], [], [], [], [], [], []
@@ -807,9 +861,7 @@ def _read_features_pod5_q(signal_q, features_batch_q, errornum_q,
             base_stds.clear(); base_signal_lens.clear()
             k_signals.clear(); labels.clear()
 
-    read_num = 0
-    for item in iter(signal_q.get, None):
-        read_name, signal = item
+    def _handle_read(read_name, signal):
         feats = _extract_pod5_features(read_name, signal, bam_index, motif_seqs, positions, args)
         for (si, kseq, smeans, sstds, slens, ksig, lbl) in feats:
             sampleinfo.append(si)
@@ -823,32 +875,51 @@ def _read_features_pod5_q(signal_q, features_batch_q, errornum_q,
                 _flush()
                 while features_batch_q.qsize() > queue_size_border_f5batch:
                     time.sleep(time_wait)
-        read_num += 1
 
-    _flush()  # emit the last partial batch
-    print("read_pod5_features process-{} ending, processed {} reads".format(os.getpid(), read_num))
+    read_num = 0
+    for file in files[worker_id::nproc_io]:
+        try:
+            if file_type == 'pod5':
+                with _pod5.Reader(file) as reader:
+                    for rec in reader.reads():
+                        _handle_read(str(rec.read_id), rec.signal.copy())
+                        read_num += 1
+            elif file_type in ('slow5', 'blow5'):
+                s5 = _pyslow5.Open(file, 'r')
+                try:
+                    for rec in s5.seq_reads():
+                        _handle_read(str(rec['read_id']), rec['signal'].copy())
+                        read_num += 1
+                finally:
+                    s5.close()
+        except Exception as e:
+            print("pod5_io_worker-{}: skipping {} — {}".format(worker_id, file, e), flush=True)
+
+    _flush()
+    print("pod5_io_worker-{} (pid {}) done, {} reads".format(worker_id, os.getpid(), read_num))
 
 
 def call_mods_pod5(args):
     """
     Multi-process pod5/slow5 inference pipeline.
 
-    Architecture (mirrors the fast5 GPU pipeline):
-      producer (1)  →  signal_q  →  CPU feature workers (nproc - nproc_gpu - 1)
-                    →  features_batch_q  →  GPU workers (nproc_gpu, reuse _call_mods_q)
-                    →  pred_str_q  →  writer (1)
+    Architecture (no intermediate signal_q):
+      IO workers (nproc_extract, each owns files[i::nproc_extract])
+          → features_batch_q
+          → GPU workers (nproc_gpu)
+          → pred_str_q
+          → writer (1)
 
-    This separates CPU-bound feature extraction from GPU inference so the GPU
-    is never stalled waiting for BAM lookups / signal normalization.
+    Each IO worker reads its own file shard, does BAM lookups, and extracts
+    features inline — eliminating the single-producer bottleneck of the old
+    producer → signal_q → feature-worker design.
     """
     start = time.time()
     mp.set_start_method("spawn", force=True)
     mp.set_sharing_strategy("file_system")
 
-    is_dna = args.is_dna
     is_recursive = str2bool(args.recursively)
-
-    motif_seqs = get_motif_seqs(args.motifs, is_dna)
+    motif_seqs = get_motif_seqs(args.motifs, args.is_dna)
     positions = read_position_file(args.positions) if args.positions else None
     file_type = detect_file_type(args.input_path, is_recursive)
     files_dr = get_files(args.input_path, is_recursive, file_type)
@@ -862,10 +933,7 @@ def call_mods_pod5(args):
         nproc = nproc_gpu + 2
     nproc_extract = nproc - nproc_gpu - 1
 
-    # ---- queues ----
-    signal_q = Queue(maxsize=500)          # (read_name, signal) from producer
-    features_batch_q = Queue()             # batched feature tuples
-    errornum_q = Queue()
+    features_batch_q = Queue()
     pred_str_q = Queue()
 
     # ---- writer ----
@@ -877,66 +945,52 @@ def call_mods_pod5(args):
     p_writer.daemon = True
     p_writer.start()
 
-    # ---- GPU / inference workers (reuse _call_mods_q) ----
+    # ---- GPU / inference workers ----
     gpulist = _get_gpus()
-    gpuindex = 0
     call_mods_gpu_procs = []
-    for _ in range(nproc_gpu):
+    for i in range(nproc_gpu):
         p = mp.Process(
             target=_call_mods_q,
             args=(args.model_path, features_batch_q, pred_str_q,
-                  None, args, gpulist[gpuindex]),
-            name="gpu-{}".format(gpulist[gpuindex]),
+                  None, args, gpulist[i]),
+            name="gpu-{}".format(gpulist[i]),
         )
-        gpuindex += 1
         p.daemon = True
         p.start()
         call_mods_gpu_procs.append(p)
 
-    # ---- CPU feature-extraction workers ----
-    # pod5_producer puts nproc_extract sentinel Nones at the end, one per worker,
-    # so workers stop cleanly without any forwarding.
-    features_batch_procs = []
-    for _ in range(nproc_extract):
+    # ---- merged IO+feature workers (one shard each, no shared signal_q) ----
+    io_procs = []
+    for wid in range(nproc_extract):
         p = mp.Process(
-            target=_read_features_pod5_q,
-            args=(signal_q, features_batch_q, errornum_q,
-                  args.bam, motif_seqs, positions, args),
-            name="feat-extract",
+            target=_pod5_io_worker,
+            args=(wid, files_dr, features_batch_q,
+                  args.bam, motif_seqs, positions, file_type, nproc_extract, args),
+            name="io-{}".format(wid),
         )
         p.daemon = True
         p.start()
-        features_batch_procs.append(p)
+        io_procs.append(p)
 
-    # ---- producer (started after workers so signal_q is being consumed) ----
-    p_producer = mp.Process(
-        target=pod5_producer,
-        args=(files_dr, signal_q, nproc_extract, file_type),
-        name="producer",
-    )
-    p_producer.start()
-
-    # ---- wait for feature workers, with crash detection ----
+    # ---- wait for IO workers, with crash detection ----
     while True:
-        running = any(p.is_alive() for p in features_batch_procs)
+        running = any(p.is_alive() for p in io_procs)
         if not running:
             break
         crashed = (
             any(p.exitcode not in (None, 0) for p in call_mods_gpu_procs)
             or (not p_writer.is_alive() and p_writer.exitcode not in (None, 0))
-            or (not p_producer.is_alive() and p_producer.exitcode not in (None, 0))
         )
         if crashed:
-            print("[WARNING] upstream/downstream process crashed, terminating feature workers")
-            for p in features_batch_procs:
+            print("[WARNING] downstream process crashed, terminating IO workers")
+            for p in io_procs:
                 p.terminate()
             break
         time.sleep(time_wait)
 
-    for p in features_batch_procs:
+    for p in io_procs:
         p.join()
 
-    # signal GPU workers to stop
     features_batch_q.put("kill")
 
     for p in call_mods_gpu_procs:
@@ -944,8 +998,6 @@ def call_mods_pod5(args):
 
     pred_str_q.put("kill")
     p_writer.join()
-
-    p_producer.join()
 
     print("[main] call_mods costs %.2f seconds.." % (time.time() - start))
     print("[Main] all done", flush=True)
